@@ -251,4 +251,5 @@ Answer:"""
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # DEBUG MODE IS NOW OFF FOR SECURITY
+    app.run(host='0.0.0.0', port=port, debug=False)
