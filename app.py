@@ -251,5 +251,5 @@ Answer:"""
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    # DEBUG MODE IS NOW OFF FOR SECURITY
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # DEBUG MODE IS ON FOR TESTING – will be set to False when deployed to Render
+    app.run(host='0.0.0.0', port=port, debug=True)
