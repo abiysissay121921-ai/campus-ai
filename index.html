@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus AI 🤖</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='image/Cupmasai.png') }}">
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background: #f7f7f8;
+        }
+
+        /* Sidebar layout and components formatting updates */
+        #sidebar {
+            width: 340px;
+            min-width: 340px;
+            background-color: #202123;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 12px;
+            border-right: 1px solid #2d2f34;
+            transition: margin-left 0.25s ease-in-out, width 0.25s ease-in-out;
+        }
+
+        /* Class to slide sidebar out of view entirely */
+        #sidebar.sidebar-hidden {
+            margin-left: -340px;
+        }
+
+        #sidebar-title-area {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid #3e4147;
+            padding-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        #sidebar-title-area img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        #sidebar h2 {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #10b981;
+        }
+
+        #course-menu-container {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 4px;
+        }
+
+        .subject-category {
+            border-radius: 8px;
+            background-color: #2d2f34;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .subject-header {
+            padding: 16px;
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+            line-height: 1.4;
+            min-height: 52px;
+        }
+
+        .subject-header:hover {
+            background-color: #3e4147;
+        }
+
+        .chat-special {
+            background-color: #1e3a8a !important;
+            border-left: 4px solid #3b82f6;
+        }
+        .chat-special:hover {
+            background-color: #1e40af !important;
+        }
+
+        .subtopic-list {
+            display: none;
+            background-color: #1a1b1e;
+            padding: 4px 0;
+            flex-direction: column;
+            gap: 1px;
+            width: 100%;
+        }
+
+        .subtopic-item {
+            padding: 14px 20px;
+            font-size: 13px;
+            color: #c5c6c7;
+            cursor: pointer;
+            transition: all 0.2s;
+            line-height: 1.4;
+            display: block;
+            border-bottom: 1px solid #25262b;
+        }
+
+        .subtopic-item:hover {
+            background-color: #2a2b30;
+            color: #ffffff;
+        }
+
+        .subtopic-item.active-topic {
+            background-color: #10b981;
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Workspace workspace layout engine rules */
+        #main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #f7f7f8;
+            position: relative;
+        }
+
+        #chat-header {
+            padding: 18px;
+            font-weight: 600;
+            font-size: 16px;
+            border-bottom: 1px solid #e5e7eb;
+            background-color: #fff;
+            text-align: center;
+            color: #1f2937;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Control utility buttons styling profile */
+        .utility-btn {
+            background-color: #374151;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .utility-btn:hover {
+            background-color: #4b5563;
+        }
+
+        #toggle-chat-btn {
+            background-color: #ef4444;
+            display: none; /* Shows up only when active document loads */
+        }
+        #toggle-chat-btn:hover {
+            background-color: #dc2626;
+        }
+
+        #workspace-body {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            background-color: #f3f4f6;
+            width: 100%;
+        }
+
+        #document-pane {
+            flex: 1;
+            display: none;
+            padding: 14px;
+            height: 100%;
+        }
+
+        #chat-pane {
+            flex: 1; /* Automatically stretches to take all available wide space on launch */
+            display: flex;
+            flex-direction: column;
+            padding: 14px;
+            overflow-y: auto;
+            gap: 16px;
+            height: 100%;
+            background-color: transparent;
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Seamless layout frame view components */
+        .document-view-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            background: white;
+        }
+
+        /* Quiz Layout Styles */
+        .quiz-container {
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .quiz-question-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .quiz-question-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 14px;
+        }
+
+        .quiz-options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .quiz-option-btn {
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: white;
+            text-align: left;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quiz-option-btn:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .quiz-option-btn.correct-choice {
+            background-color: #d1fae5 !important;
+            border-color: #10b981 !important;
+            color: #065f46;
+            font-weight: 600;
+        }
+
+        .quiz-option-btn.wrong-choice {
+            background-color: #fee2e2 !important;
+            border-color: #ef4444 !important;
+            color: #991b1b;
+        }
+
+        .quiz-explanation-box {
+            margin-top: 14px;
+            padding: 12px 16px;
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #1e40af;
+            line-height: 1.5;
+            display: none;
+        }
+
+        .empty-welcome-hub {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: auto;
+            text-align: center;
+            max-width: 600px;
+            padding: 40px 20px;
+        }
+
+        .empty-welcome-hub img {
+            width: 150px;
+            height: auto;
+            margin-bottom: 24px;
+            opacity: 0.95;
+            object-fit: contain;
+        }
+
+        .empty-welcome-hub h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+
+        .empty-welcome-hub p {
+            font-size: 15px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 14px;
+            word-wrap: break-word;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .user {
+            align-self: flex-end;
+            background-color: #10b981;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .ai {
+            align-self: flex-start;
+            background-color: #ffffff;
+            color: #374151;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .error-card {
+            background-color: #fee2e2 !important;
+            color: #991b1b !important;
+            border: 1px solid #fca5a5;
+            white-space: pre-wrap;
+        }
+
+        #input-container {
+            display: flex;
+            padding: 16px;
+            background-color: #fff;
+            border-top: 1px solid #e5e7eb;
+            z-index: 10;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 14px 20px;
+            border-radius: 24px;
+            border: 1px solid #d1d5db;
+            font-size: 15px;
+            outline: none;
+        }
+
+        #user-input:focus {
+            border-color: #10b981;
+        }
+
+        #send-btn {
+            padding: 12px 28px;
+            margin-left: 12px;
+            background-color: #10b981;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        #send-btn:hover {
+            background-color: #059669;
+        }
+
+        #chat-pane::-webkit-scrollbar,
+        #course-menu-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chat-pane::-webkit-scrollbar-thumb,
+        #course-menu-container::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div id="sidebar-title-area">
+            <img src="{{ url_for('static', filename='image/Cupmasai.png') }}" alt="Campus AI Logo">
+            <h2>CAMPUS AI</h2>
+        </div>
+        <div id="course-menu-container"></div>
+    </div>
+
+    <div id="main-chat">
+        <div id="chat-header">
+            <button class="utility-btn" onclick="toggleSidebarMenu()">☰ Menu</button>
+            <span id="header-text">Select a Subject or Unit Module to Begin Reviewing</span>
+            <button id="toggle-chat-btn" class="utility-btn" onclick="toggleChatPane()">Hide Chat ✕</button>
+        </div>
+        
+        <div id="workspace-body">
+            <div id="document-pane"></div>
+            
+            <div id="chat-pane">
+                <div class="empty-welcome-hub">
+                    <img src="{{ url_for('static', filename='image/Cupmasai.png') }}" alt="Campus AI Centerpiece Logo">
+                    <h1>How can I help your learning journey today?</h1>
+                    <p>Click any course folder on the left panel to browse structured study summaries, practice midterms, or final examinations directly.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="input-container">
+            <input type="text" id="user-input" placeholder="Select a topic to start typing..." autocomplete="off" disabled>
+            <button id="send-btn" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        const sendBtn = document.getElementById("send-btn");
+        const userInput = document.getElementById("user-input");
+        const documentPane = document.getElementById("document-pane");
+        const chatPane = document.getElementById("chat-pane");
+        const chatHeaderText = document.getElementById("header-text");
+        const toggleChatBtn = document.getElementById("toggle-chat-btn");
+        const menuContainer = document.getElementById("course-menu-container");
+        const sidebar = document.getElementById("sidebar");
+
+        let activeSubject = "";
+        let activeSubtopic = "";
+        let isChatVisible = true;
+        let isSidebarVisible = true;
+
+        function toggleSidebarMenu() {
+            if (isSidebarVisible) {
+                sidebar.classList.add("sidebar-hidden");
+                isSidebarVisible = false;
+            } else {
+                sidebar.classList.remove("sidebar-hidden");
+                isSidebarVisible = true;
+            }
+        }
+
+        function toggleChatPane() {
+            if (isChatVisible) {
+                chatPane.style.display = "none";
+                toggleChatBtn.innerText = "Show Chat 💬";
+                toggleChatBtn.style.backgroundColor = "#10b981";
+                isChatVisible = false;
+            } else {
+                chatPane.style.display = "flex";
+                toggleChatBtn.innerText = "Hide Chat ✕";
+                toggleChatBtn.style.backgroundColor = "#ef4444";
+                isChatVisible = true;
+                chatPane.scrollTop = chatPane.scrollHeight;
+            }
+        }
+
+        async function loadCurriculumUI() {
+            try {
+                const response = await fetch('/get_curriculum');
+                const menuData = await response.json();
+                
+                menuContainer.innerHTML = "";
+                Object.keys(menuData).forEach(subject => {
+                    const categoryDiv = document.createElement("div");
+                    categoryDiv.className = "subject-category";
+                    
+                    const isSpecial = subject === "Chat with me";
+                    
+                    categoryDiv.innerHTML = `
+                        <div class="subject-header ${isSpecial ? 'chat-special' : ''}">
+                            <span>${isSpecial ? '💬' : '📁'} ${subject}</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="subtopic-list"></div>
+                    `;
+                    
+                    const header = categoryDiv.querySelector(".subject-header");
+                    const list = categoryDiv.querySelector(".subtopic-list");
+                    
+                    header.onclick = () => {
+                        const isCurrentlyVisible = list.style.display === "flex";
+                        document.querySelectorAll(".subtopic-list").forEach(el => el.style.display = "none");
+                        document.querySelectorAll(".subject-header span:last-child").forEach(el => el.innerText = "▼");
+                        
+                        if (!isCurrentlyVisible) {
+                            list.style.display = "flex";
+                            header.querySelector("span:last-child").innerText = "▲";
+                        }
+                    };
+                    
+                    menuData[subject].forEach(subtopic => {
+                        const item = document.createElement("div");
+                        item.className = "subtopic-item";
+                        
+                        let prefixIcon = "📄";
+                        if (isSpecial) prefixIcon = "✨";
+                        else if (subtopic.includes("Notes")) prefixIcon = "📝";
+                        
+                        item.innerText = isSpecial ? `${prefixIcon} Start Open Discussion` : `${prefixIcon} ${subtopic}`;
+                        
+                        item.onclick = () => {
+                            document.querySelectorAll(".subtopic-item").forEach(el => el.classList.remove("active-topic"));
+                            item.classList.add("active-topic");
+                            switchTopicUnit(subject, subtopic);
+                        };
+                        list.appendChild(item);
+                    });
+                    menuContainer.appendChild(categoryDiv);
+                });
+            } catch (err) {
+                console.error("Failed to map dynamic curriculum layouts:", err);
+            }
+        }
+
+        async function switchTopicUnit(subject, subtopic) {
+            activeSubject = subject;
+            activeSubtopic = subtopic;
+            
+            documentPane.style.display = "none";
+            documentPane.innerHTML = "";
+            chatPane.innerHTML = "";
+            
+            if(subject === "Chat with me") {
+                chatHeaderText.innerText = "Campus AI - Open Learning Workspace";
+                toggleChatBtn.style.display = "none";
+                chatPane.style.display = "flex";
+                
+                chatPane.style.flex = "1";
+                chatPane.style.minWidth = "auto";
+                chatPane.style.backgroundColor = "transparent";
+                isChatVisible = true;
+                
+                userInput.placeholder = "Ask me anything across any subject area...";
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                appendMessage("Welcome to your open study space! You can ask general questions here without narrowing down to an exact course path.", "ai");
+                return;
+            } 
+
+            chatPane.style.flex = "none";
+            chatPane.style.width = "400px"; 
+            chatPane.style.minWidth = "400px";
+            chatPane.style.backgroundColor = "#ffffff";
+            chatPane.style.borderLeft = "1px solid #e5e7eb";
+            
+            toggleChatBtn.style.display = "block";
+            toggleChatBtn.innerText = "Hide Chat ✕";
+            toggleChatBtn.style.backgroundColor = "#ef4444";
+            isChatVisible = true;
+
+            chatHeaderText.innerText = `${subject} ➔ ${subtopic}`;
+            userInput.placeholder = `Ask a question about ${subtopic}...`;
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            
+            chatPane.innerHTML = "<div><em>Loading study document workspace...</em></div>";
+
+            try {
+                const response = await fetch('/get_questions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject: subject, subtopic: subtopic })
+                });
+                const data = await response.json();
+                
+                chatPane.innerHTML = ""; 
+                
+                if (data.found) {
+                    documentPane.style.display = "block";
+                    
+                    if (data.type === "quiz") {
+                        // Render Interactive Multiple Choice Setup Layout Container
+                        const quizContainer = document.createElement("div");
+                        quizContainer.className = "quiz-container";
+                        
+                        data.questions.forEach((q, qIdx) => {
+                            const qCard = document.createElement("div");
+                            qCard.className = "quiz-question-card";
+                            
+                            qCard.innerHTML = `
+                                <div class="quiz-question-text">Q${qIdx + 1}: ${q.question}</div>
+                                <div class="quiz-options-list"></div>
+                                <div class="quiz-explanation-box" id="explain-${qIdx}">
+                                    <strong>💡 Explanation:</strong> ${q.explanation}
+                                </div>
+                            `;
+                            
+                            const optionsList = qCard.querySelector(".quiz-options-list");
+                            
+                            Object.keys(q.alternatives).forEach(key => {
+                                const optBtn = document.createElement("button");
+                                optBtn.className = "quiz-option-btn";
+                                optBtn.innerText = `${key}. ${q.alternatives[key]}`;
+                                
+                                optBtn.onclick = () => {
+                                    const allButtons = optionsList.querySelectorAll(".quiz-option-btn");
+                                    allButtons.forEach(btn => btn.disabled = true);
+                                    
+                                    if (key === q.correct) {
+                                        optBtn.classList.add("correct-choice");
+                                    } else {
+                                        optBtn.classList.add("wrong-choice");
+                                        allButtons.forEach(btn => {
+                                            if(btn.innerText.startsWith(q.correct + ".")) {
+                                                btn.classList.add("correct-choice");
+                                            }
+                                        });
+                                    }
+                                    
+                                    document.getElementById(`explain-${qIdx}`).style.display = "block";
+                                };
+                                
+                                optionsList.appendChild(optBtn);
+                            });
+                            
+                            quizContainer.appendChild(qCard);
+                        });
+                        
+                        documentPane.appendChild(quizContainer);
+                        appendMessage(`I've opened the interactive quiz workspace for **${subtopic}**. Select your choice answers to reveal instant explanations!`, "ai");
+                    } else {
+                        // Standard Document Iframe Render Path
+                        const iframe = document.createElement("iframe");
+                        iframe.src = `${data.file_url}#toolbar=0&navpanes=0`;
+                        iframe.className = "document-view-frame";
+                        documentPane.appendChild(iframe);
+                        
+                        appendMessage(`I've opened **${subtopic}**. How can I assist you with these study notes today?`, "ai");
+                    }
+                } else {
+                    const errorBubble = document.createElement("div");
+                    errorBubble.className = "message ai error-card";
+                    errorBubble.innerText = data.content;
+                    chatPane.appendChild(errorBubble);
+                }
+                
+            } catch (err) {
+                chatPane.innerHTML = "";
+                appendMessage("❌ Error loading the requested module structure canvas.", "ai");
+                console.error(err);
+            }
+        }
+
+        function appendMessage(text, sender) {
+            const msg = document.createElement("div");
+            msg.className = `message ${sender}`;
+            
+            if (window.marked) {
+                msg.innerHTML = marked.parse(text);
+            } else {
+                msg.innerText = text;
+            }
+            
+            chatPane.appendChild(msg);
+            chatPane.scrollTop = chatPane.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message || !activeSubject) return;
+
+            appendMessage(message, "user");
+            userInput.value = "";
+            
+            const loader = document.createElement("div");
+            loader.className = "message ai";
+            loader.innerHTML = "<em>Thinking...</em>";
+            chatPane.appendChild(loader);
+            chatPane.scrollTop = chatPane.scrollHeight;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        subject: activeSubject, 
+                        subtopic: activeSubtopic, 
+                        message: message 
+                    })
+                });
+                const data = await response.json();
+                
+                loader.remove();
+                
+                if (data.response) {
+                    appendMessage(data.response, "ai");
+                } else if (data.content) {
+                    appendMessage(data.content, "ai");
+                } else {
+                    appendMessage("I received your question but couldn't parse a message content packet.", "ai");
+                }
+            } catch (err) {
+                loader.remove();
+                appendMessage("❌ Failed to communicate with Campus AI server.", "ai");
+                console.error(err);
+            }
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        userInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+
+        loadCurriculumUI();
+    </script>
+</body>
+</html>
