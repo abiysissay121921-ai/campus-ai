@@ -27,7 +27,7 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="freshman_knowledge_base")
 
-# Curriculum (keep your full CURRICULUM – I've included a sample, you should keep yours)
+# Curriculum
 CURRICULUM = {
     "Chat with me": ["General Chat"],
     "Communicative English Language Skills I": ["English I Study Notes", "English I Mid Questions", "English I Final Questions"],
@@ -199,6 +199,7 @@ def chat():
     active_subtopic = data.get("subtopic", "")
 
     try:
+        # Retrieve RAG context
         results = collection.get(where={"$and": [{"subject": active_subject}, {"subtopic": active_subtopic}]})
         documents = results.get("documents", [])
         context_string = documents[0] if documents else ""
@@ -217,9 +218,9 @@ Answer:"""
 Question: {user_message}
 Answer:"""
 
-        # --- CORRECT MODEL (gemini-3.5-flash) ---
+        # --- GEMINI CALL WITH NEW SDK AND WORKING MODEL ---
         response = client.models.generate_content(
-            model='gemini-3.5-flash',
+            model='gemini-3.5-flash',   # confirmed working model
             contents=prompt
         )
         ai_response = response.text if response.text else "I couldn't generate a response."
