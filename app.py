@@ -4,10 +4,7 @@ from flask import Flask, request, jsonify, render_template, session, send_file
 import chromadb
 import json
 from dotenv import load_dotenv
-
-# NEW: Use the updated Gemini SDK
 from google import genai
-from google.genai import types
 
 # Load environment variables
 load_dotenv()
@@ -29,9 +26,7 @@ if not GEMINI_API_KEY:
 # Initialize the client with the new SDK
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# We'll use the model name directly in the call
-
-# Initialize ChromaDB (unchanged)
+# Initialize ChromaDB
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="freshman_knowledge_base")
 
@@ -55,7 +50,7 @@ CURRICULUM = {
     "General Biology": ["Biology Study Notes", "Biology Mid Questions", "Biology Final Questions"]
 }
 
-# Ensure directories exist (unchanged)
+# Ensure directories exist
 for folder in [UPLOAD_FOLDER, PRELOAD_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -67,7 +62,6 @@ for subject, subtopics in CURRICULUM.items():
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-# File processing functions (unchanged)
 def extract_text_from_file(filepath, filename):
     from pypdf import PdfReader
     from docx import Document
@@ -128,7 +122,6 @@ def preload_system_course_materials():
 
 preload_system_course_materials()
 
-# Routes (unchanged except /chat for better error handling)
 @app.route('/')
 def index():
     if 'user_id' not in session:
@@ -229,27 +222,21 @@ Question: {user_message}
 Answer:"""
 
         # --- GEMINI CALL USING NEW SDK ---
-        # Model name: 'gemini-2.0-flash' or 'gemini-1.5-flash' – using latest stable
         response = client.models.generate_content(
-            model='gemini-2.0-flash',   # or 'gemini-1.5-flash'
+            model='gemini-1.5-flash',   # or 'gemini-2.0-flash' if available
             contents=prompt
         )
-        # New SDK returns a GenerateContentResponse object with .text
         ai_response = response.text if response.text else "I couldn't generate a response."
 
         session['chat_count'] += 1
         return jsonify({"response": ai_response})
 
     except Exception as e:
-        # Log the full error in the terminal for debugging
         print(f"ERROR in /chat: {e}")
-        # In development, we can return the error message (except the API key)
-        # We'll check if the error message contains the API key and redact it
+        # Return the actual error to the frontend for debugging (but redact API key if present)
         error_msg = str(e)
         if "API key" in error_msg or "apikey" in error_msg.lower():
             error_msg = "Invalid or missing API key. Please check your .env file."
-        # For production, you can hide the error and show a generic message
-        # Here we show a detailed error in development but not expose sensitive info
         return jsonify({"response": f"Error: {error_msg}"}), 500
 
 if __name__ == '__main__':
