@@ -27,7 +27,7 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="freshman_knowledge_base")
 
-# Curriculum (keep your full list)
+# Curriculum
 CURRICULUM = {
     "Chat with me": ["General Chat"],
     "Communicative English Language Skills I": ["English I Study Notes", "English I Mid Questions", "English I Final Questions"],
@@ -217,7 +217,7 @@ Answer:"""
 Question: {user_message}
 Answer:"""
 
-        # --- NEW SDK CALL (gemini-3.5-flash) ---
+        # --- NEW SDK CALL ---
         response = client.models.generate_content(
             model='gemini-3.5-flash',
             contents=prompt
