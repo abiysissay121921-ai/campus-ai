@@ -4,9 +4,12 @@ from flask import Flask, request, jsonify, render_template, session, send_file
 import chromadb
 import json
 from dotenv import load_dotenv
-import google.generativeai as genai
 
-# Load environment variables from .env file
+# NEW: Use the updated Gemini SDK
+from google import genai
+from google.genai import types
+
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
@@ -18,21 +21,21 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 MAX_CHAT_LIMIT = 10
 
-# --- GEMINI CONFIGURATION ---
+# --- GEMINI CONFIGURATION (using new SDK) ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not set in environment. Please add it to .env file.")
 
-genai.configure(api_key=GEMINI_API_KEY)
-# Using 'gemini-1.5-flash' for fast, cost-effective responses.
-# Switch to 'gemini-1.5-pro' if you need more complex reasoning.
-GEMINI_MODEL = genai.GenerativeModel('gemini-1.5-flash')
+# Initialize the client with the new SDK
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-# Initialize ChromaDB
+# We'll use the model name directly in the call
+
+# Initialize ChromaDB (unchanged)
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="freshman_knowledge_base")
 
-# Curriculum Blueprint Map
+# Curriculum Blueprint Map (unchanged)
 CURRICULUM = {
     "Chat with me": ["General Chat"],
     "Communicative English Language Skills I": ["English I Study Notes", "English I Mid Questions", "English I Final Questions"],
@@ -52,12 +55,11 @@ CURRICULUM = {
     "General Biology": ["Biology Study Notes", "Biology Mid Questions", "Biology Final Questions"]
 }
 
-# Ensure baseline directories exist
+# Ensure directories exist (unchanged)
 for folder in [UPLOAD_FOLDER, PRELOAD_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-# Automatically generate folders on your hard drive
 for subject, subtopics in CURRICULUM.items():
     safe_subject_name = subject.replace(" ", "_").replace("(", "").replace(")", "")
     for subtopic in subtopics:
@@ -65,6 +67,7 @@ for subject, subtopics in CURRICULUM.items():
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
+# File processing functions (unchanged)
 def extract_text_from_file(filepath, filename):
     from pypdf import PdfReader
     from docx import Document
@@ -89,10 +92,9 @@ def process_and_store_file(filepath, filename, subject, subtopic):
     raw_text = extract_text_from_file(filepath, filename)
     if not raw_text.strip():
         return False
-    
     collection.add(
-        documents=[raw_text], 
-        ids=[f"{subject}_{subtopic}_{filename}"], 
+        documents=[raw_text],
+        ids=[f"{subject}_{subtopic}_{filename}"],
         metadatas=[{
             "source": filename,
             "subject": subject,
@@ -114,21 +116,19 @@ def preload_system_course_materials():
         for subtopic in subtopics:
             subtopic_folder_name = subtopic.replace(" ", "_")
             target_dir = os.path.join(PRELOAD_FOLDER, safe_subject_name, subtopic_folder_name)
-            
             if not os.path.exists(target_dir):
                 continue
-                
             files = [f for f in os.listdir(target_dir) if f.split('.')[-1].lower() in ['pdf', 'docx', 'txt']]
             for filename in files:
                 if filename in existing_sources:
                     continue
-                
                 print(f" ⏳ Indexing [{subject} -> {subtopic}]: '{filename}'")
                 filepath = os.path.join(target_dir, filename)
                 process_and_store_file(filepath, filename, subject, subtopic)
 
 preload_system_course_materials()
 
+# Routes (unchanged except /chat for better error handling)
 @app.route('/')
 def index():
     if 'user_id' not in session:
@@ -145,18 +145,14 @@ def get_questions():
     data = request.json
     subject = data.get("subject", "")
     subtopic = data.get("subtopic", "")
-    
     safe_subject = subject.replace(" ", "_").replace("(", "").replace(")", "")
     safe_subtopic = subtopic.replace(" ", "_")
-    
     folder_path = os.path.join(PRELOAD_FOLDER, safe_subject, safe_subtopic)
-    
     if not os.path.exists(folder_path):
         return jsonify({
-            "found": False, 
+            "found": False,
             "content": f"### No resource found\n\nPlease place your official `{safe_subtopic}.json` or PDF inside:\n`knowledge_base/{safe_subject}/{safe_subtopic}/`"
         })
-        
     is_questions_mode = "Questions" in subtopic
     if is_questions_mode:
         quiz_files = [f for f in os.listdir(folder_path) if f.endswith('.json') and not f.startswith('.')]
@@ -171,21 +167,19 @@ def get_questions():
                 })
             except Exception as e:
                 print(f"Failed decoding JSON quiz file structure: {str(e)}")
-
     files = [f for f in os.listdir(folder_path) if f.split('.')[-1].lower() in ['pdf', 'docx', 'txt'] and not f.startswith('.')]
-    
     if files:
         target_filename = files[0]
         file_url = f"/view_file?subject={safe_subject}&subtopic={safe_subtopic}&filename={target_filename}"
         return jsonify({
-            "found": True, 
+            "found": True,
             "type": "document",
             "file_url": file_url,
             "filename": target_filename
         })
     else:
         return jsonify({
-            "found": False, 
+            "found": False,
             "content": f"### No structural resource assets discovered\n\nPlease place your official `{safe_subtopic}.json` dataset or document sheets within:\n`knowledge_base/{safe_subject}/{safe_subtopic}/`"
         })
 
@@ -194,9 +188,7 @@ def view_file():
     subject = request.args.get('subject')
     subtopic = request.args.get('subtopic')
     filename = request.args.get('filename')
-    
     exact_filepath = os.path.join(PRELOAD_FOLDER, subject, subtopic, filename)
-    
     if os.path.exists(exact_filepath):
         return send_file(exact_filepath)
     else:
@@ -206,7 +198,6 @@ def view_file():
 def chat():
     if 'chat_count' not in session:
         session['chat_count'] = 0
-        
     if session['chat_count'] >= MAX_CHAT_LIMIT:
         return jsonify({
             "response": f"⚠️ **Daily Session Limit Reached:** You have used your {MAX_CHAT_LIMIT} complimentary AI queries. You can still browse all study notes and exam files freely without limits!"
@@ -216,13 +207,13 @@ def chat():
     user_message = data.get("message", "")
     active_subject = data.get("subject", "")
     active_subtopic = data.get("subtopic", "")
-    
+
     try:
         # Retrieve RAG context from ChromaDB
         results = collection.get(where={"$and": [{"subject": active_subject}, {"subtopic": active_subtopic}]})
         documents = results.get("documents", [])
         context_string = documents[0] if documents else ""
-            
+
         if active_subject != "Chat with me" and context_string:
             prompt = f"""You are Campus AI. Assist the student by answering their question using the reference text provided below.
 
@@ -233,23 +224,34 @@ Student's Question: {user_message}
 Answer:"""
         else:
             prompt = f"""You are Campus AI, a supportive university assistant. Answer the student's question clearly.
-            
+
 Question: {user_message}
 Answer:"""
-        
-        # --- GEMINI CALL (replaces Ollama) ---
-        gemini_response = GEMINI_MODEL.generate_content(prompt)
-        ai_response = gemini_response.text if gemini_response.text else "I couldn't generate a response."
-        
+
+        # --- GEMINI CALL USING NEW SDK ---
+        # Model name: 'gemini-2.0-flash' or 'gemini-1.5-flash' – using latest stable
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',   # or 'gemini-1.5-flash'
+            contents=prompt
+        )
+        # New SDK returns a GenerateContentResponse object with .text
+        ai_response = response.text if response.text else "I couldn't generate a response."
+
         session['chat_count'] += 1
-        
         return jsonify({"response": ai_response})
-    
+
     except Exception as e:
-        print(f"Error in /chat: {e}")
-        return jsonify({"response": "Error during processing. Please try again later."})
+        # Log the full error in the terminal for debugging
+        print(f"ERROR in /chat: {e}")
+        # In development, we can return the error message (except the API key)
+        # We'll check if the error message contains the API key and redact it
+        error_msg = str(e)
+        if "API key" in error_msg or "apikey" in error_msg.lower():
+            error_msg = "Invalid or missing API key. Please check your .env file."
+        # For production, you can hide the error and show a generic message
+        # Here we show a detailed error in development but not expose sensitive info
+        return jsonify({"response": f"Error: {error_msg}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    # DEBUG MODE IS ON FOR TESTING – will be set to False when deployed to Render
     app.run(host='0.0.0.0', port=port, debug=True)
