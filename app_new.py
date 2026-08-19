@@ -1,4 +1,4 @@
-\cat > app_new.py << 'EOF'
+cat > app_new.py << 'EOF'
 import os
 import uuid
 from flask import Flask, request, jsonify, render_template, session, send_file
