@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify, render_template, session, send_file
 import chromadb
 import json
 from dotenv import load_dotenv
-from google import genai   # <-- CORRECT IMPORT
+from google import genai
 
 load_dotenv()
 
@@ -16,19 +16,18 @@ PRELOAD_FOLDER = 'knowledge_base'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 MAX_CHAT_LIMIT = 10
 
-# --- GEMINI CONFIG ---
+# --- GEMINI CONFIG (NEW SDK) ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not set in environment.")
 
-# NEW SDK CLIENT
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ChromaDB
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="freshman_knowledge_base")
 
-# Curriculum
+# Curriculum (keep your full list)
 CURRICULUM = {
     "Chat with me": ["General Chat"],
     "Communicative English Language Skills I": ["English I Study Notes", "English I Mid Questions", "English I Final Questions"],
@@ -200,7 +199,6 @@ def chat():
     active_subtopic = data.get("subtopic", "")
 
     try:
-        # Retrieve RAG context
         results = collection.get(where={"$and": [{"subject": active_subject}, {"subtopic": active_subtopic}]})
         documents = results.get("documents", [])
         context_string = documents[0] if documents else ""
@@ -219,7 +217,7 @@ Answer:"""
 Question: {user_message}
 Answer:"""
 
-        # --- NEW SDK CALL (uses v1, gemini-3.5-flash) ---
+        # --- NEW SDK CALL (gemini-3.5-flash) ---
         response = client.models.generate_content(
             model='gemini-3.5-flash',
             contents=prompt
