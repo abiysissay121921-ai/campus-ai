@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify, render_template, session, send_file
 import chromadb
 import json
 from dotenv import load_dotenv
-from google import genai
+from google import genai   # <-- CORRECT IMPORT
 
 load_dotenv()
 
@@ -21,6 +21,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not set in environment.")
 
+# NEW SDK CLIENT
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ChromaDB
@@ -190,7 +191,7 @@ def chat():
         session['chat_count'] = 0
     if session['chat_count'] >= MAX_CHAT_LIMIT:
         return jsonify({
-            "response": f"⚠️ **Daily Session Limit Reached:** You have used your {MAX_CHAT_LIMIT} complimentary AI queries. You can still browse all study notes and exam files freely without limits!"
+            "response": f"⚠️ **Daily Session Limit Reached:** You have used your {MAX_CHAT_LIMIT} complimentary AI queries."
         }), 403
 
     data = request.json
@@ -218,9 +219,9 @@ Answer:"""
 Question: {user_message}
 Answer:"""
 
-        # --- GEMINI CALL WITH NEW SDK AND WORKING MODEL ---
+        # --- NEW SDK CALL (uses v1, gemini-3.5-flash) ---
         response = client.models.generate_content(
-            model='gemini-3.5-flash',   # confirmed working model
+            model='gemini-3.5-flash',
             contents=prompt
         )
         ai_response = response.text if response.text else "I couldn't generate a response."
