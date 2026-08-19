@@ -3,6 +3,6 @@ requests
 chromadb
 pypdf
 python-docx
-google-generativeai
+google-genai   # instead of google-generativeai
 python-dotenv
 gunicorn
