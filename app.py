@@ -1,3 +1,4 @@
+cat > app.py << 'EOF'
 import os
 import requests
 from flask import Flask, render_template_string, request, jsonify
@@ -13,14 +14,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LuLM6fJtFv5H_sGNGGO8
 GEMINI_MODEL = "gemini-3.5-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
-# Initialize ChromaDB
+# ChromaDB
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 try:
     collection = chroma_client.get_collection(name="campus_kb")
 except Exception:
     collection = chroma_client.get_or_create_collection(name="campus_kb")
 
-# Curriculum (as before)
+# Curriculum (same as before)
 CURRICULUM = {
     "General Psychology": {
         "modules": ["Introduction & Research Methods", "Biological Bases of Behavior", "Sensation & Perception", "Learning & Memory"],
@@ -40,7 +41,6 @@ CURRICULUM = {
     }
 }
 
-# Frontend HTML (same as before – using Tailwind CSS)
 INDEX_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -128,7 +128,7 @@ def chat():
         if not user_message:
             return jsonify({'error': 'Empty message'}), 400
 
-        # Optional RAG context from ChromaDB
+        # RAG context (optional)
         context_text = ""
         try:
             results = collection.query(query_texts=[user_message], n_results=2)
@@ -137,17 +137,11 @@ def chat():
         except Exception:
             pass
 
-        # Build prompt
         prompt = f"Context from study materials:\n{context_text}\n\nUser Question: {user_message}" if context_text else user_message
 
-        # Call Gemini API using requests (the exact working curl command)
-        payload = {
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }]
-        }
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(GEMINI_URL, json=payload, headers=headers)
+        # Use the same request as curl
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        response = requests.post(GEMINI_URL, json=payload, headers={"Content-Type": "application/json"})
 
         if response.status_code == 200:
             result = response.json()
@@ -161,3 +155,4 @@ def chat():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=True)
+EOF
