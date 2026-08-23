@@ -1,239 +1,163 @@
 import os
-import uuid
-from flask import Flask, request, jsonify, render_template, session, send_file
-import chromadb
-import json
+from flask import Flask, render_template_string, request, jsonify
 from dotenv import load_dotenv
 from google import genai
+import chromadb
 
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "campus_ai_secure_fallback_key")
 
-UPLOAD_FOLDER = 'uploads'
-PRELOAD_FOLDER = 'knowledge_base'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-MAX_CHAT_LIMIT = 10
+# Configuration & API Key Initialization
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LuLM6fJtFv5H_sGNGGO845moH4L5-eMoTo3BJkte0Ntg")
 
-# --- GEMINI CONFIG (NEW SDK) ---
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY not set in environment.")
-
+# Initialize the new Google GenAI client cleanly
 client = genai.Client(api_key=GEMINI_API_KEY)
+GEMINI_MODEL = "gemini-3.5-flash"
 
-# ChromaDB
+# Initialize ChromaDB (Local Persistent Client)
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
-collection = chroma_client.get_or_create_collection(name="freshman_knowledge_base")
+collection = chroma_client.get_or_create_collection(name="campus_kb")
 
-# Curriculum
+# University Curriculum Knowledge Base Structure
 CURRICULUM = {
-    "Chat with me": ["General Chat"],
-    "Communicative English Language Skills I": ["English I Study Notes", "English I Mid Questions", "English I Final Questions"],
-    "Communicative English Language Skills II": ["English II Study Notes", "English II Mid Questions", "English II Final Questions"],
-    "Logic and Critical Thinking": ["Logic Study Notes", "Logic Mid Questions", "Logic Final Questions"],
-    "Economics": ["Economics Study Notes", "Economics Mid Questions", "Economics Final Questions"],
-    "Entrepreneurship": ["Entrepreneurship Study Notes", "Entrepreneurship Mid Questions", "Entrepreneurship Final Questions"],
-    "Geography of Ethiopia and the Horn": ["Geography Study Notes", "Geography Mid Questions", "Geography Final Questions"],
-    "History of Ethiopia and the Horn": ["History Study Notes", "History Mid Questions", "History Final Questions"],
-    "Introduction to Emerging Technologies": ["Emerging Tech Study Notes", "Emerging Tech Mid Questions", "Emerging Tech Final Questions"],
-    "General Psychology": ["Psychology Study Notes", "Psychology Mid Questions", "Psychology Final Questions"],
-    "Social Anthropology": ["Anthropology Study Notes", "Anthropology Mid Questions", "Anthropology Final Questions"],
-    "Global Trends": ["Global Trends Study Notes", "Global Trends Mid Questions", "Global Trends Final Questions"],
-    "Civics and Moral Education": ["Civics Study Notes", "Civics Mid Questions", "Civics Final Questions"],
-    "Inclusiveness": ["Inclusiveness Study Notes", "Inclusiveness Mid Questions", "Inclusiveness Final Questions"],
-    "General Chemistry": ["Chemistry Study Notes", "Chemistry Mid Questions", "Chemistry Final Questions"],
-    "General Biology": ["Biology Study Notes", "Biology Mid Questions", "Biology Final Questions"]
+    "General Psychology": {
+        "modules": ["Introduction & Research Methods", "Biological Bases of Behavior", "Sensation & Perception", "Learning & Memory"],
+        "description": "Fundamental principles of human behavior and mental processes."
+    },
+    "Chemistry": {
+        "modules": ["Atomic Structure", "Chemical Bonding", "Stoichiometry", "Thermodynamics"],
+        "description": "Core university-level general chemistry principles."
+    },
+    "History": {
+        "modules": ["World Civilizations", "The Industrial Revolution", "Modern Global Conflicts", "Contemporary History"],
+        "description": "Major historical eras, movements, and global transformations."
+    },
+    "Geography": {
+        "modules": ["Physical Geography", "Human & Cultural Geography", "Geographic Information Systems (GIS)", "Global Urbanization"],
+        "description": "Study of earth landscapes, environments, and human societies."
+    }
 }
 
-# Ensure directories exist
-for folder in [UPLOAD_FOLDER, PRELOAD_FOLDER]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+# Frontend HTML template embedded for a unified self-contained file execution
+INDEX_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAMPUS AI - University Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+    <header class="bg-slate-800 border-b border-slate-700 p-4 shadow-md flex justify-between items-center">
+        <h1 class="text-xl font-bold text-cyan-400 tracking-wide">CAMPUS AI <span class="text-xs bg-cyan-900 text-cyan-200 px-2 py-1 rounded ml-2">Gemini 3.5 Flash</span></h1>
+        <span class="text-sm text-slate-400">Local RAG & Education Hub</span>
+    </header>
 
-for subject, subtopics in CURRICULUM.items():
-    safe_subject_name = subject.replace(" ", "_").replace("(", "").replace(")", "")
-    for subtopic in subtopics:
-        folder_path = os.path.join(PRELOAD_FOLDER, safe_subject_name, subtopic.replace(" ", "_"))
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+    <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 max-w-7xl mx-auto w-full">
+        <!-- Sidebar Curriculum -->
+        <aside class="w-full md:w-1/4 bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col gap-4">
+            <h2 class="font-semibold text-slate-200 border-b border-slate-700 pb-2">Curriculum Subjects</h2>
+            <div class="flex flex-col gap-2">
+                {% for subject, details in curriculum.items() %}
+                <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60">
+                    <h3 class="font-bold text-cyan-300 text-sm">{{ subject }}</h3>
+                    <p class="text-xs text-slate-400 mt-1">{{ details.description }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </aside>
 
-def extract_text_from_file(filepath, filename):
-    from pypdf import PdfReader
-    from docx import Document
-    ext = filename.split('.')[-1].lower()
-    text = ""
-    try:
-        if ext == 'txt':
-            with open(filepath, 'r', encoding='utf-8') as f:
-                text = f.read()
-        elif ext == 'pdf':
-            reader = PdfReader(filepath)
-            for page in reader.pages:
-                text += page.extract_text() or ""
-        elif ext == 'docx':
-            doc = Document(filepath)
-            text = "\n".join([para.text for para in doc.paragraphs])
-    except Exception as e:
-        print(f"Error reading {filename}: {str(e)}")
-    return text
+        <!-- Chat Container -->
+        <section class="flex-1 bg-slate-800 rounded-xl border border-slate-700 flex flex-col h-[70vh] md:h-auto overflow-hidden">
+            <div id="chat-history" class="flex-1 p-4 overflow-y-auto space-y-4 flex flex-col">
+                <div class="bg-slate-700/50 p-3 rounded-lg max-w-[80%] self-start text-sm">
+                    Hello! I'm your CAMPUS AI assistant powered by Gemini 3.5 Flash. Ask me anything about your university coursework, subjects, or study guides!
+                </div>
+            </div>
+            
+            <div class="p-3 bg-slate-800 border-t border-slate-700 flex gap-2">
+                <input type="text" id="user-input" placeholder="Type your academic query..." 
+                    class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                <button onclick="sendMessage()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition">Send</button>
+            </div>
+        </section>
+    </main>
 
-def process_and_store_file(filepath, filename, subject, subtopic):
-    raw_text = extract_text_from_file(filepath, filename)
-    if not raw_text.strip():
-        return False
-    collection.add(
-        documents=[raw_text],
-        ids=[f"{subject}_{subtopic}_{filename}"],
-        metadatas=[{
-            "source": filename,
-            "subject": subject,
-            "subtopic": subtopic
-        }]
-    )
-    return True
+    <script>
+        async function sendMessage() {
+            const inputField = document.getElementById('user-input');
+            const chatHistory = document.getElementById('chat-history');
+            const message = inputField.value.trim();
+            if (!message) return;
 
-def preload_system_course_materials():
-    print("\n[System] Synchronizing structured freshman course library matrix...")
-    try:
-        existing_records = collection.get()
-        existing_sources = set(meta['source'] for meta in existing_records.get('metadatas', []) if meta)
-    except Exception:
-        existing_sources = set()
+            // Append User Message
+            chatHistory.innerHTML += `<div class="bg-cyan-900/40 border border-cyan-700/50 p-3 rounded-lg max-w-[80%] self-end text-sm">${message}</div>`;
+            inputField.value = '';
+            chatHistory.scrollTop = chatHistory.scrollHeight;
 
-    for subject, subtopics in CURRICULUM.items():
-        safe_subject_name = subject.replace(" ", "_").replace("(", "").replace(")", "")
-        for subtopic in subtopics:
-            subtopic_folder_name = subtopic.replace(" ", "_")
-            target_dir = os.path.join(PRELOAD_FOLDER, safe_subject_name, subtopic_folder_name)
-            if not os.path.exists(target_dir):
-                continue
-            files = [f for f in os.listdir(target_dir) if f.split('.')[-1].lower() in ['pdf', 'docx', 'txt']]
-            for filename in files:
-                if filename in existing_sources:
-                    continue
-                print(f" ⏳ Indexing [{subject} -> {subtopic}]: '{filename}'")
-                filepath = os.path.join(target_dir, filename)
-                process_and_store_file(filepath, filename, subject, subtopic)
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                const data = await res.json();
+                
+                // Append AI Response
+                chatHistory.innerHTML += `<div class="bg-slate-700/50 border border-slate-600/50 p-3 rounded-lg max-w-[80%] self-start text-sm">${data.response || data.error}</div>`;
+            } catch (err) {
+                chatHistory.innerHTML += `<div class="bg-red-900/50 p-3 rounded-lg max-w-[80%] self-start text-sm text-red-200">Error communicating with server.</div>`;
+            }
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
 
-preload_system_course_materials()
+        document.getElementById('user-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') { sendMessage(); }
+        });
+    </script>
+</body>
+</html>
+"""
 
 @app.route('/')
 def index():
-    if 'user_id' not in session:
-        session['user_id'] = str(uuid.uuid4())
-        session['chat_count'] = 0
-    return render_template('index.html')
-
-@app.route('/get_curriculum', methods=['GET'])
-def get_curriculum():
-    return jsonify(CURRICULUM)
-
-@app.route('/get_questions', methods=['POST'])
-def get_questions():
-    data = request.json
-    subject = data.get("subject", "")
-    subtopic = data.get("subtopic", "")
-    safe_subject = subject.replace(" ", "_").replace("(", "").replace(")", "")
-    safe_subtopic = subtopic.replace(" ", "_")
-    folder_path = os.path.join(PRELOAD_FOLDER, safe_subject, safe_subtopic)
-    if not os.path.exists(folder_path):
-        return jsonify({
-            "found": False,
-            "content": f"### No resource found\n\nPlease place your official `{safe_subtopic}.json` or PDF inside:\n`knowledge_base/{safe_subject}/{safe_subtopic}/`"
-        })
-    is_questions_mode = "Questions" in subtopic
-    if is_questions_mode:
-        quiz_files = [f for f in os.listdir(folder_path) if f.endswith('.json') and not f.startswith('.')]
-        if quiz_files:
-            try:
-                with open(os.path.join(folder_path, quiz_files[0]), 'r', encoding='utf-8') as f:
-                    quiz_data = json.load(f)
-                return jsonify({
-                    "found": True,
-                    "type": "quiz",
-                    "questions": quiz_data
-                })
-            except Exception as e:
-                print(f"Failed decoding JSON quiz file structure: {str(e)}")
-    files = [f for f in os.listdir(folder_path) if f.split('.')[-1].lower() in ['pdf', 'docx', 'txt'] and not f.startswith('.')]
-    if files:
-        target_filename = files[0]
-        file_url = f"/view_file?subject={safe_subject}&subtopic={safe_subtopic}&filename={target_filename}"
-        return jsonify({
-            "found": True,
-            "type": "document",
-            "file_url": file_url,
-            "filename": target_filename
-        })
-    else:
-        return jsonify({
-            "found": False,
-            "content": f"### No structural resource assets discovered\n\nPlease place your official `{safe_subtopic}.json` dataset or document sheets within:\n`knowledge_base/{safe_subject}/{safe_subtopic}/`"
-        })
-
-@app.route('/view_file', methods=['GET'])
-def view_file():
-    subject = request.args.get('subject')
-    subtopic = request.args.get('subtopic')
-    filename = request.args.get('filename')
-    exact_filepath = os.path.join(PRELOAD_FOLDER, subject, subtopic, filename)
-    if os.path.exists(exact_filepath):
-        return send_file(exact_filepath)
-    else:
-        return "Requested document resource not found on local workspace disk paths.", 404
+    return render_template_string(INDEX_HTML, curriculum=CURRICULUM)
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    if 'chat_count' not in session:
-        session['chat_count'] = 0
-    if session['chat_count'] >= MAX_CHAT_LIMIT:
-        return jsonify({
-            "response": f"⚠️ **Daily Session Limit Reached:** You have used your {MAX_CHAT_LIMIT} complimentary AI queries."
-        }), 403
-
-    data = request.json
-    user_message = data.get("message", "")
-    active_subject = data.get("subject", "")
-    active_subtopic = data.get("subtopic", "")
-
     try:
-        results = collection.get(where={"$and": [{"subject": active_subject}, {"subtopic": active_subtopic}]})
-        documents = results.get("documents", [])
-        context_string = documents[0] if documents else ""
+        data = request.json
+        user_message = data.get('message', '')
+        
+        if not user_message:
+            return jsonify({'error': 'Empty message received'}), 400
 
-        if active_subject != "Chat with me" and context_string:
-            prompt = f"""You are Campus AI. Assist the student by answering their question using the reference text provided below.
+        # Optional RAG Context Retrieval from ChromaDB
+        context_text = ""
+        try:
+            results = collection.query(query_texts=[user_message], n_results=2)
+            if results and results.get('documents') and results['documents'][0]:
+                context_text = "\n".join(results['documents'][0])
+        except Exception:
+            pass # Skip if collection is unpopulated or empty
 
-Reference Document Context:
-{context_string}
+        # Construct prompt incorporating context if available
+        prompt = f"Context from study materials:\n{context_text}\n\nUser Question: {user_message}" if context_text else user_message
 
-Student's Question: {user_message}
-Answer:"""
-        else:
-            prompt = f"""You are Campus AI, a supportive university assistant. Answer the student's question clearly.
-
-Question: {user_message}
-Answer:"""
-
-        # --- NEW SDK CALL ---
+        # Correct new SDK Client call syntax
         response = client.models.generate_content(
-            model='gemini-3.5-flash',
+            model=GEMINI_MODEL,
             contents=prompt
         )
-        ai_response = response.text if response.text else "I couldn't generate a response."
 
-        session['chat_count'] += 1
-        return jsonify({"response": ai_response})
+        return jsonify({'response': response.text})
 
     except Exception as e:
-        print(f"ERROR in /chat: {e}")
-        error_msg = str(e)
-        if "API key" in error_msg or "apikey" in error_msg.lower():
-            error_msg = "Invalid or missing API key. Please check your .env file."
-        return jsonify({"response": f"Error: {error_msg}"}), 500
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # Runs on port 5002 as requested
+    app.run(host='0.0.0.0', port=5002, debug=True)
