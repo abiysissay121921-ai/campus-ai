@@ -1,26 +1,26 @@
 import os
+import requests
 from flask import Flask, render_template_string, request, jsonify
 from dotenv import load_dotenv
-from google import genai
 import chromadb
 
-# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 
-# Configuration & API Key Initialization
+# Configuration
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LuLM6fJtFv5H_sGNGGO845moH4L5-eMoTo3BJkte0Ntg")
-
-# Initialize the new Google GenAI client cleanly
-client = genai.Client(api_key=GEMINI_API_KEY)
 GEMINI_MODEL = "gemini-3.5-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
-# Initialize ChromaDB (Local Persistent Client)
+# Initialize ChromaDB
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
-collection = chroma_client.get_or_create_collection(name="campus_kb")
+try:
+    collection = chroma_client.get_collection(name="campus_kb")
+except Exception:
+    collection = chroma_client.get_or_create_collection(name="campus_kb")
 
-# University Curriculum Knowledge Base Structure
+# Curriculum (as before)
 CURRICULUM = {
     "General Psychology": {
         "modules": ["Introduction & Research Methods", "Biological Bases of Behavior", "Sensation & Perception", "Learning & Memory"],
@@ -40,7 +40,7 @@ CURRICULUM = {
     }
 }
 
-# Frontend HTML template embedded for a unified self-contained file execution
+# Frontend HTML (same as before – using Tailwind CSS)
 INDEX_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -57,7 +57,6 @@ INDEX_HTML = """
     </header>
 
     <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 max-w-7xl mx-auto w-full">
-        <!-- Sidebar Curriculum -->
         <aside class="w-full md:w-1/4 bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col gap-4">
             <h2 class="font-semibold text-slate-200 border-b border-slate-700 pb-2">Curriculum Subjects</h2>
             <div class="flex flex-col gap-2">
@@ -70,14 +69,12 @@ INDEX_HTML = """
             </div>
         </aside>
 
-        <!-- Chat Container -->
         <section class="flex-1 bg-slate-800 rounded-xl border border-slate-700 flex flex-col h-[70vh] md:h-auto overflow-hidden">
             <div id="chat-history" class="flex-1 p-4 overflow-y-auto space-y-4 flex flex-col">
                 <div class="bg-slate-700/50 p-3 rounded-lg max-w-[80%] self-start text-sm">
                     Hello! I'm your CAMPUS AI assistant powered by Gemini 3.5 Flash. Ask me anything about your university coursework, subjects, or study guides!
                 </div>
             </div>
-            
             <div class="p-3 bg-slate-800 border-t border-slate-700 flex gap-2">
                 <input type="text" id="user-input" placeholder="Type your academic query..." 
                     class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
@@ -93,7 +90,6 @@ INDEX_HTML = """
             const message = inputField.value.trim();
             if (!message) return;
 
-            // Append User Message
             chatHistory.innerHTML += `<div class="bg-cyan-900/40 border border-cyan-700/50 p-3 rounded-lg max-w-[80%] self-end text-sm">${message}</div>`;
             inputField.value = '';
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -105,8 +101,6 @@ INDEX_HTML = """
                     body: JSON.stringify({ message: message })
                 });
                 const data = await res.json();
-                
-                // Append AI Response
                 chatHistory.innerHTML += `<div class="bg-slate-700/50 border border-slate-600/50 p-3 rounded-lg max-w-[80%] self-start text-sm">${data.response || data.error}</div>`;
             } catch (err) {
                 chatHistory.innerHTML += `<div class="bg-red-900/50 p-3 rounded-lg max-w-[80%] self-start text-sm text-red-200">Error communicating with server.</div>`;
@@ -131,33 +125,39 @@ def chat():
     try:
         data = request.json
         user_message = data.get('message', '')
-        
         if not user_message:
-            return jsonify({'error': 'Empty message received'}), 400
+            return jsonify({'error': 'Empty message'}), 400
 
-        # Optional RAG Context Retrieval from ChromaDB
+        # Optional RAG context from ChromaDB
         context_text = ""
         try:
             results = collection.query(query_texts=[user_message], n_results=2)
             if results and results.get('documents') and results['documents'][0]:
                 context_text = "\n".join(results['documents'][0])
         except Exception:
-            pass # Skip if collection is unpopulated or empty
+            pass
 
-        # Construct prompt incorporating context if available
+        # Build prompt
         prompt = f"Context from study materials:\n{context_text}\n\nUser Question: {user_message}" if context_text else user_message
 
-        # Correct new SDK Client call syntax
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt
-        )
+        # Call Gemini API using requests (the exact working curl command)
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(GEMINI_URL, json=payload, headers=headers)
 
-        return jsonify({'response': response.text})
+        if response.status_code == 200:
+            result = response.json()
+            ai_response = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "No response")
+            return jsonify({'response': ai_response})
+        else:
+            return jsonify({'error': f'Gemini API error: {response.text}'}), response.status_code
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Runs on port 5002 as requested
     app.run(host='0.0.0.0', port=5002, debug=True)
