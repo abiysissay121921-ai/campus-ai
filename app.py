@@ -1,7 +1,7 @@
 import os
 import uuid
-from flask import Flask, request, jsonify, render_template, session, send_file
 import json
+from flask import Flask, request, jsonify, render_template, session, send_file
 import chromadb
 
 app = Flask(__name__)
@@ -9,24 +9,29 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "campus_ai_secure_fallback_k
 
 PRELOAD_FOLDER = 'knowledge_base'
 
-# Initialize ChromaDB (not used for AI now, but kept for future)
+# ChromaDB (kept for possible future use)
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="freshman_knowledge_base")
 
-# Curriculum Blueprint Map
-CURRICULUM = {
-    "General Psychology": ["Introduction & Research Methods", "Biological Bases of Behavior", "Sensation & Perception", "Learning & Memory"],
-    "Chemistry": ["Atomic Structure", "Chemical Bonding", "Stoichiometry", "Thermodynamics"],
-    "History": ["World Civilizations", "The Industrial Revolution", "Modern Global Conflicts", "Contemporary History"],
-    "Geography": ["Physical Geography", "Human & Cultural Geography", "Geographic Information Systems (GIS)", "Global Urbanization"]
-}
+# --- DYNAMICALLY BUILD CURRICULUM FROM FOLDERS ---
+def build_curriculum():
+    curriculum = {}
+    if not os.path.exists(PRELOAD_FOLDER):
+        os.makedirs(PRELOAD_FOLDER)
+    for item in os.listdir(PRELOAD_FOLDER):
+        folder_path = os.path.join(PRELOAD_FOLDER, item)
+        if os.path.isdir(folder_path) and not item.startswith('.'):
+            # Each folder becomes a subject
+            # We'll use the folder name as subject, and a single dummy subtopic "Content"
+            curriculum[item] = ["Content"]
+    return curriculum
 
-# Ensure folders exist
-for subject, subtopics in CURRICULUM.items():
-    safe_subject = subject.replace(" ", "_").replace("(", "").replace(")", "")
-    for subtopic in subtopics:
-        folder_path = os.path.join(PRELOAD_FOLDER, safe_subject, subtopic.replace(" ", "_"))
-        os.makedirs(folder_path, exist_ok=True)
+CURRICULUM = build_curriculum()
+
+# Ensure folders exist (just in case)
+for subject in CURRICULUM.keys():
+    folder_path = os.path.join(PRELOAD_FOLDER, subject)
+    os.makedirs(folder_path, exist_ok=True)
 
 @app.route('/')
 def index():
@@ -42,56 +47,58 @@ def get_curriculum():
 def get_questions():
     data = request.json
     subject = data.get("subject", "")
-    subtopic = data.get("subtopic", "")
+    subtopic = data.get("subtopic", "")  # we ignore subtopic now
 
-    safe_subject = subject.replace(" ", "_").replace("(", "").replace(")", "")
-    safe_subtopic = subtopic.replace(" ", "_")
-    folder_path = os.path.join(PRELOAD_FOLDER, safe_subject, safe_subtopic)
+    folder_path = os.path.join(PRELOAD_FOLDER, subject)
 
     if not os.path.exists(folder_path):
         return jsonify({
             "found": False,
-            "content": f"### No resource found\n\nPlace your files in:\n`knowledge_base/{safe_subject}/{safe_subtopic}/`"
+            "content": f"Subject folder not found: {subject}"
         })
 
-    # If the subtopic has "Questions" in name, try to load JSON quiz
-    if "Questions" in subtopic:
-        quiz_files = [f for f in os.listdir(folder_path) if f.endswith('.json') and not f.startswith('.')]
-        if quiz_files:
-            try:
-                with open(os.path.join(folder_path, quiz_files[0]), 'r', encoding='utf-8') as f:
-                    quiz_data = json.load(f)
-                return jsonify({
-                    "found": True,
-                    "type": "quiz",
-                    "questions": quiz_data
-                })
-            except Exception as e:
-                print(f"Error loading quiz: {e}")
+    # Look for any file in the folder
+    all_files = os.listdir(folder_path)
+    # Filter out directories and hidden files
+    files = [f for f in all_files if os.path.isfile(os.path.join(folder_path, f)) and not f.startswith('.')]
 
-    # Otherwise, look for documents
-    files = [f for f in os.listdir(folder_path) if f.split('.')[-1].lower() in ['pdf', 'docx', 'txt'] and not f.startswith('.')]
-    if files:
-        target = files[0]
-        file_url = f"/view_file?subject={safe_subject}&subtopic={safe_subtopic}&filename={target}"
+    # First check for JSON (quiz)
+    quiz_files = [f for f in files if f.endswith('.json')]
+    if quiz_files:
+        try:
+            with open(os.path.join(folder_path, quiz_files[0]), 'r', encoding='utf-8') as f:
+                quiz_data = json.load(f)
+            return jsonify({
+                "found": True,
+                "type": "quiz",
+                "questions": quiz_data
+            })
+        except Exception as e:
+            print(f"Error loading quiz: {e}")
+
+    # Then check for documents
+    doc_files = [f for f in files if f.split('.')[-1].lower() in ['pdf', 'docx', 'txt']]
+    if doc_files:
+        target = doc_files[0]
+        file_url = f"/view_file?subject={subject}&filename={target}"
         return jsonify({
             "found": True,
             "type": "document",
             "file_url": file_url,
             "filename": target
         })
-    else:
-        return jsonify({
-            "found": False,
-            "content": f"### No files found\n\nPlace a PDF, DOCX, TXT, or JSON in:\n`knowledge_base/{safe_subject}/{safe_subtopic}/`"
-        })
+
+    # No files found
+    return jsonify({
+        "found": False,
+        "content": f"No study materials found in `{subject}`. Place PDF, DOCX, TXT, or JSON files."
+    })
 
 @app.route('/view_file', methods=['GET'])
 def view_file():
     subject = request.args.get('subject')
-    subtopic = request.args.get('subtopic')
     filename = request.args.get('filename')
-    filepath = os.path.join(PRELOAD_FOLDER, subject, subtopic, filename)
+    filepath = os.path.join(PRELOAD_FOLDER, subject, filename)
     if os.path.exists(filepath):
         return send_file(filepath)
     return "File not found", 404
