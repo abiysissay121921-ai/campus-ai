@@ -3,234 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campus AI — Academic Assistant</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Campus AI – Study Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* RESET & GLOBAL */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Inter', -apple-system, sans-serif;
+            font-family: 'Inter', sans-serif;
+            display: flex;
             height: 100vh;
-            overflow: hidden;
             background: #f1f5f9;
             color: #0f172a;
-            display: flex;
+            overflow: hidden;
         }
-
-        /* SCROLLBAR */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 8px; }
-
-        /* SIDEBAR */
         #sidebar {
-            width: 280px;
-            min-width: 280px;
+            width: 300px;
+            min-width: 300px;
             background: #0f172a;
             color: #e2e8f0;
-            display: flex;
-            flex-direction: column;
             padding: 20px 16px;
             border-right: 1px solid #1e293b;
-            transition: margin-left 0.25s ease;
-            height: 100vh;
             overflow-y: auto;
-            flex-shrink: 0;
-        }
-        #sidebar.sidebar-hidden { margin-left: -280px; }
-
-        .sidebar-brand {
             display: flex;
-            align-items: center;
-            gap: 12px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #1e293b;
-            margin-bottom: 24px;
+            flex-direction: column;
         }
-        .sidebar-brand img {
-            width: 36px;
-            height: 36px;
-            object-fit: contain;
-        }
-        .sidebar-brand h1 {
+        #sidebar h2 {
             font-size: 20px;
             font-weight: 700;
-            letter-spacing: -0.5px;
             color: #f8fafc;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #1e293b;
         }
-        .sidebar-brand h1 span { color: #3b82f6; }
-
-        /* Navigation */
-        .nav-section { margin-bottom: 24px; }
-        .nav-section-title {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-            color: #64748b;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            color: #94a3b8;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.15s;
-            text-decoration: none;
-            margin-bottom: 2px;
-        }
-        .nav-item:hover { background: #1e293b; color: #f1f5f9; }
-        .nav-item.active { background: #1e293b; color: #f1f5f9; }
-        .nav-item i { width: 20px; text-align: center; font-size: 15px; }
-        .nav-item .badge {
-            margin-left: auto;
-            background: #3b82f6;
-            color: white;
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 12px;
-        }
-
-        /* Subject tree */
         .subject-category {
-            margin-top: 6px;
-            border-radius: 8px;
-            overflow: hidden;
+            margin-bottom: 12px;
         }
         .subject-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 14px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
+            padding: 10px 12px;
+            background: #1e293b;
             border-radius: 8px;
-            transition: background 0.15s;
-            color: #cbd5e1;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .subject-header:hover { background: #1e293b; color: #f1f5f9; }
-        .subject-header i { margin-right: 10px; width: 18px; }
-        .subject-header .arrow { font-size: 12px; transition: transform 0.2s; }
-        .subject-header.open .arrow { transform: rotate(180deg); }
-
+        .subject-header:hover { background: #2d3748; }
         .subtopic-list {
             display: none;
+            padding-left: 16px;
+            margin-top: 6px;
             flex-direction: column;
-            gap: 2px;
-            padding: 4px 0 4px 20px;
+            gap: 4px;
         }
-        .subtopic-list.open { display: flex; }
         .subtopic-item {
-            padding: 8px 14px;
-            font-size: 13px;
-            color: #94a3b8;
-            cursor: pointer;
+            padding: 8px 12px;
+            background: #1e293b;
             border-radius: 6px;
-            transition: all 0.15s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+            border-left: 3px solid transparent;
         }
-        .subtopic-item:hover { background: #1e293b; color: #f1f5f9; }
-        .subtopic-item.active { background: #3b82f6; color: white; font-weight: 500; }
-        .subtopic-item i { font-size: 12px; width: 16px; }
+        .subtopic-item:hover { background: #2d3748; }
+        .subtopic-item.active { border-left-color: #3b82f6; background: #2d3748; }
 
-        /* MAIN CONTENT */
-        #main-content {
+        #main {
             flex: 1;
             display: flex;
             flex-direction: column;
+            padding: 20px 28px;
             background: #f8fafc;
-            min-width: 0;
+            overflow: hidden;
         }
-
-        /* HEADER */
         #header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 16px 28px;
-            background: white;
-            border-bottom: 1px solid #e2e8f0;
-            flex-shrink: 0;
-        }
-        #header-left { display: flex; align-items: center; gap: 16px; }
-        .menu-btn {
-            background: none;
-            border: none;
             font-size: 20px;
-            cursor: pointer;
-            color: #475569;
-            display: none;
-        }
-        #header-title {
-            font-size: 16px;
             font-weight: 600;
+            margin-bottom: 16px;
             color: #0f172a;
         }
-        #header-title small {
-            font-weight: 400;
-            color: #64748b;
-            font-size: 13px;
-            margin-left: 8px;
-        }
-        #header-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .header-btn {
-            background: none;
-            border: 1px solid #e2e8f0;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-size: 13px;
-            cursor: pointer;
-            color: #475569;
-            transition: all 0.15s;
-        }
-        .header-btn:hover { background: #f1f5f9; }
-
-        /* WORKSPACE */
-        #workspace {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            padding: 20px 28px 28px 28px;
-            gap: 24px;
-        }
-
-        /* Document pane */
+        #header small { font-weight: 400; color: #64748b; font-size: 14px; margin-left: 12px; }
         #document-pane {
             flex: 1;
-            display: none;
             background: white;
             border-radius: 12px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             overflow: hidden;
-            min-width: 0;
+            padding: 8px;
         }
-        #document-pane.active { display: block; }
         .document-view-frame {
             width: 100%;
             height: 100%;
             border: none;
         }
-
-        /* Quiz pane */
-        .quiz-container {
-            padding: 24px;
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             height: 100%;
-            overflow-y: auto;
+            color: #64748b;
+            text-align: center;
         }
+        .empty-state h3 { font-size: 22px; color: #1e293b; margin-bottom: 8px; }
+        .quiz-container { padding: 20px; height: 100%; overflow-y: auto; }
         .quiz-question-card {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -238,11 +114,7 @@
             padding: 20px;
             margin-bottom: 20px;
         }
-        .quiz-question-text {
-            font-weight: 600;
-            font-size: 15px;
-            margin-bottom: 14px;
-        }
+        .quiz-question-text { font-weight: 600; margin-bottom: 14px; }
         .quiz-options-list { display: flex; flex-direction: column; gap: 8px; }
         .quiz-option-btn {
             padding: 10px 16px;
@@ -250,9 +122,8 @@
             border-radius: 6px;
             background: white;
             text-align: left;
-            font-size: 14px;
             cursor: pointer;
-            transition: all 0.15s;
+            transition: 0.15s;
         }
         .quiz-option-btn:hover { background: #f1f5f9; }
         .quiz-option-btn.correct { background: #dcfce7; border-color: #22c55e; }
@@ -267,337 +138,54 @@
             color: #1e3a8a;
             display: none;
         }
-
-        /* Chat pane */
-        #chat-pane {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            overflow: hidden;
-            min-width: 0;
-            transition: all 0.2s;
-        }
-        #chat-pane.full-width { flex: 1; }
-        #chat-pane.side-chat {
-            flex: 0 0 400px;
-            min-width: 320px;
-            border-left: 1px solid #e2e8f0;
-            border-radius: 0 12px 12px 0;
-            box-shadow: none;
-        }
-
-        /* Chat messages */
-        #chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .message {
-            max-width: 85%;
-            padding: 12px 18px;
-            border-radius: 12px;
-            font-size: 14px;
-            line-height: 1.6;
-            word-wrap: break-word;
-            position: relative;
-        }
-        .message.user {
-            align-self: flex-end;
-            background: #3b82f6;
-            color: white;
-            border-bottom-right-radius: 4px;
-        }
-        .message.ai {
-            align-self: flex-start;
-            background: #f1f5f9;
-            color: #0f172a;
-            border-bottom-left-radius: 4px;
-        }
-        .message.ai .msg-actions {
-            margin-top: 8px;
-            display: flex;
-            gap: 8px;
-            opacity: 0.6;
-            font-size: 12px;
-        }
-        .message.ai .msg-actions button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: #64748b;
-            font-size: 13px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            transition: all 0.15s;
-        }
-        .message.ai .msg-actions button:hover { background: #e2e8f0; color: #0f172a; }
-        .message .timestamp {
-            font-size: 10px;
-            opacity: 0.5;
-            margin-top: 4px;
-            display: block;
-        }
-        .typing-indicator {
-            display: flex;
-            gap: 4px;
-            padding: 8px 0;
-        }
-        .typing-indicator span {
-            width: 8px;
-            height: 8px;
-            background: #94a3b8;
-            border-radius: 50%;
-            animation: bounce 1.2s infinite;
-        }
-        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes bounce {
-            0%, 60%, 100% { transform: translateY(0); }
-            30% { transform: translateY(-6px); }
-        }
-
-        /* Welcome / Dashboard */
-        .welcome-view {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            padding: 40px 20px;
-            text-align: center;
-            background: #fafcff;
-        }
-        .welcome-view img {
-            width: 120px;
-            height: auto;
-            margin-bottom: 24px;
-            opacity: 0.9;
-        }
-        .welcome-view h2 {
-            font-size: 24px;
-            font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 8px;
-        }
-        .welcome-view p {
-            color: #64748b;
-            max-width: 400px;
-            margin-bottom: 28px;
-        }
-        .quick-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            justify-content: center;
-        }
-        .quick-action-btn {
-            padding: 10px 20px;
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 30px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.15s;
-            color: #0f172a;
-            font-weight: 500;
-        }
-        .quick-action-btn:hover {
-            background: #3b82f6;
-            color: white;
-            border-color: #3b82f6;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59,130,246,0.25);
-        }
-
-        /* Input */
-        #input-container {
-            display: flex;
-            padding: 12px 20px 16px 20px;
-            border-top: 1px solid #e2e8f0;
-            background: white;
-            gap: 12px;
-            align-items: flex-end;
-        }
-        #user-input {
-            flex: 1;
-            padding: 10px 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-            resize: vertical;
-            max-height: 120px;
-            font-family: inherit;
-            transition: border 0.15s;
-        }
-        #user-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
-        #user-input:disabled { background: #f1f5f9; cursor: not-allowed; }
-        #send-btn {
-            padding: 10px 24px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.15s;
-            align-self: flex-end;
-        }
-        #send-btn:hover { background: #2563eb; }
-        #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        /* Context badge */
-        .context-badge {
-            display: inline-block;
-            background: #e2e8f0;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            color: #475569;
-            margin-top: 4px;
-        }
-
-        /* Responsive */
-        @media (max-width: 1024px) {
-            #chat-pane.side-chat { flex: 1; border-left: none; border-radius: 12px; }
-            #workspace { flex-direction: column; }
-            #document-pane { min-height: 300px; }
-        }
-        @media (max-width: 768px) {
-            #sidebar { width: 260px; min-width: 260px; margin-left: -260px; }
-            #sidebar.sidebar-hidden { margin-left: 0; }
-            .menu-btn { display: block; }
-            #header { padding: 12px 16px; }
-            #workspace { padding: 12px; gap: 16px; }
-            #chat-pane.side-chat { min-width: 0; }
-            #header-title small { display: none; }
-        }
     </style>
 </head>
 <body>
 
-    <!-- SIDEBAR -->
     <div id="sidebar">
-        <div class="sidebar-brand">
-            <img src="{{ url_for('static', filename='image/Cupmasai.png') }}" alt="Campus AI">
-            <h1>Campus<span>AI</span></h1>
-        </div>
-
-        <div class="nav-section">
-            <div class="nav-section-title">Main</div>
-            <div class="nav-item active" id="nav-dashboard" onclick="showDashboard()">
-                <i class="fas fa-th-large"></i> Dashboard
-            </div>
-            <div class="nav-item" id="nav-chat" onclick="showChatOnly()">
-                <i class="fas fa-comment-dots"></i> AI Assistant
-            </div>
-        </div>
-
-        <div class="nav-section" style="flex:1; overflow-y:auto;">
-            <div class="nav-section-title">My Subjects</div>
-            <div id="course-menu-container"></div>
-        </div>
-
-        <div class="nav-section" style="border-top:1px solid #1e293b; padding-top:16px;">
-            <div class="nav-item" onclick="alert('Settings coming soon')">
-                <i class="fas fa-cog"></i> Settings
-            </div>
-        </div>
+        <h2>📚 Campus AI</h2>
+        <div id="course-menu-container"></div>
     </div>
 
-    <!-- MAIN CONTENT -->
-    <div id="main-content">
-        <!-- Header -->
+    <div id="main">
         <div id="header">
-            <div id="header-left">
-                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-                <span id="header-title">Dashboard <small id="context-label"></small></span>
-            </div>
-            <div id="header-right">
-                <button class="header-btn" onclick="clearChat()"><i class="fas fa-trash-alt"></i> Clear</button>
-            </div>
+            <span id="header-text">Select a subject and module</span>
+            <small id="context-label"></small>
         </div>
-
-        <!-- Workspace -->
-        <div id="workspace">
-            <!-- Document/Quiz Pane -->
-            <div id="document-pane"></div>
-
-            <!-- Chat Pane -->
-            <div id="chat-pane" class="full-width">
-                <div id="chat-messages">
-                    <div class="welcome-view" id="welcome-view">
-                        <img src="{{ url_for('static', filename='image/Cupmasai.png') }}" alt="Campus AI">
-                        <h2>How can I help your learning journey?</h2>
-                        <p>Select a subject from the sidebar or ask a general question.</p>
-                        <div class="quick-actions">
-                            <button class="quick-action-btn" onclick="quickAction('Explain this concept simply')">📖 Explain Concept</button>
-                            <button class="quick-action-btn" onclick="quickAction('Create practice questions for me')">📝 Practice Questions</button>
-                            <button class="quick-action-btn" onclick="quickAction('Summarize my notes')">📄 Summarize</button>
-                            <button class="quick-action-btn" onclick="quickAction('Help me prepare for my exam')">🎯 Exam Prep</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="input-container">
-                    <textarea id="user-input" rows="1" placeholder="Ask a question..." disabled></textarea>
-                    <button id="send-btn" disabled>Send</button>
-                </div>
+        <div id="document-pane">
+            <div class="empty-state">
+                <h3>Welcome to Campus AI</h3>
+                <p>Choose a subject from the sidebar to view study notes or practice questions.</p>
             </div>
         </div>
     </div>
 
     <script>
-        // DOM refs
-        const sidebar = document.getElementById('sidebar');
-        const menuBtn = document.querySelector('.menu-btn');
-        const chatMessages = document.getElementById('chat-messages');
-        const userInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-        const headerTitle = document.getElementById('header-title');
-        const contextLabel = document.getElementById('context-label');
+        const menuContainer = document.getElementById('course-menu-container');
         const documentPane = document.getElementById('document-pane');
-        const chatPane = document.getElementById('chat-pane');
-        const courseMenu = document.getElementById('course-menu-container');
-        const welcomeView = document.getElementById('welcome-view');
+        const headerText = document.getElementById('header-text');
+        const contextLabel = document.getElementById('context-label');
 
         let activeSubject = '';
         let activeSubtopic = '';
-        let isChatOnly = false;
 
-        // Load curriculum
         async function loadCurriculum() {
             try {
                 const res = await fetch('/get_curriculum');
                 const data = await res.json();
-                courseMenu.innerHTML = '';
+                menuContainer.innerHTML = '';
                 Object.keys(data).forEach(subject => {
                     const cat = document.createElement('div');
                     cat.className = 'subject-category';
                     const header = document.createElement('div');
                     header.className = 'subject-header';
-                    const icon = subject === 'Chat with me' ? 'fa-comment' : 'fa-folder';
-                    header.innerHTML = `
-                        <span><i class="fas ${icon}"></i> ${subject}</span>
-                        <span class="arrow"><i class="fas fa-chevron-down"></i></span>
-                    `;
+                    header.innerHTML = `<span>📁 ${subject}</span><span>▼</span>`;
                     const list = document.createElement('div');
                     list.className = 'subtopic-list';
                     data[subject].forEach(subtopic => {
                         const item = document.createElement('div');
                         item.className = 'subtopic-item';
-                        const itemIcon = subject === 'Chat with me' ? 'fa-comment-dots' :
-                                         subtopic.includes('Notes') ? 'fa-file-alt' :
-                                         subtopic.includes('Mid') ? 'fa-pencil-alt' :
-                                         subtopic.includes('Final') ? 'fa-graduation-cap' : 'fa-file';
-                        item.innerHTML = `<i class="fas ${itemIcon}"></i> ${subtopic}`;
+                        item.innerText = subtopic;
                         item.onclick = () => {
                             document.querySelectorAll('.subtopic-item').forEach(el => el.classList.remove('active'));
                             item.classList.add('active');
@@ -606,48 +194,29 @@
                         list.appendChild(item);
                     });
                     header.onclick = () => {
-                        list.classList.toggle('open');
-                        header.classList.toggle('open');
+                        const isOpen = list.style.display === 'flex';
+                        list.style.display = isOpen ? 'none' : 'flex';
+                        header.querySelector('span:last-child').innerText = isOpen ? '▼' : '▲';
                     };
                     cat.appendChild(header);
                     cat.appendChild(list);
-                    courseMenu.appendChild(cat);
+                    menuContainer.appendChild(cat);
                 });
                 // Auto-open first subject
-                const firstHeader = courseMenu.querySelector('.subject-header');
+                const firstHeader = menuContainer.querySelector('.subject-header');
                 if (firstHeader) firstHeader.click();
             } catch (e) {
-                console.error('Load curriculum error:', e);
+                console.error('Load error:', e);
             }
         }
 
-        // Select subject
         async function selectSubject(subject, subtopic) {
             activeSubject = subject;
             activeSubtopic = subtopic;
-            documentPane.style.display = 'none';
-            documentPane.innerHTML = '';
-            chatMessages.innerHTML = '';
-            welcomeView.style.display = 'none';
-            chatPane.className = 'full-width';
+            headerText.innerText = subject;
+            contextLabel.innerText = `→ ${subtopic}`;
+            documentPane.innerHTML = '<div style="text-align:center;padding:40px;">Loading...</div>';
 
-            if (subject === 'Chat with me') {
-                headerTitle.innerHTML = `AI Assistant <small>Open Learning</small>`;
-                contextLabel.textContent = '';
-                userInput.placeholder = 'Ask me anything...';
-                userInput.disabled = false;
-                sendBtn.disabled = false;
-                appendMessage('Welcome to your open study space! You can ask general questions without narrowing down to a specific subject.', 'ai');
-                return;
-            }
-
-            headerTitle.innerHTML = `${subject} <small>${subtopic}</small>`;
-            contextLabel.textContent = `${subject} → ${subtopic}`;
-            userInput.placeholder = `Ask about ${subtopic}...`;
-            userInput.disabled = false;
-            sendBtn.disabled = false;
-
-            // Load document/quiz
             try {
                 const res = await fetch('/get_questions', {
                     method: 'POST',
@@ -655,235 +224,65 @@
                     body: JSON.stringify({ subject, subtopic })
                 });
                 const data = await res.json();
-                if (data.found) {
-                    documentPane.style.display = 'block';
-                    chatPane.className = 'side-chat';
-                    if (data.type === 'quiz') {
-                        // Render quiz
-                        const container = document.createElement('div');
-                        container.className = 'quiz-container';
-                        data.questions.forEach((q, idx) => {
-                            const card = document.createElement('div');
-                            card.className = 'quiz-question-card';
-                            card.innerHTML = `
-                                <div class="quiz-question-text">Q${idx+1}: ${q.question}</div>
-                                <div class="quiz-options-list"></div>
-                                <div class="quiz-explanation-box" id="explain-${idx}">
-                                    <strong>💡 Explanation:</strong> ${q.explanation}
-                                </div>
-                            `;
-                            const list = card.querySelector('.quiz-options-list');
-                            Object.keys(q.alternatives).forEach(key => {
-                                const btn = document.createElement('button');
-                                btn.className = 'quiz-option-btn';
-                                btn.textContent = `${key}. ${q.alternatives[key]}`;
-                                btn.onclick = () => {
-                                    const all = list.querySelectorAll('.quiz-option-btn');
-                                    all.forEach(b => b.disabled = true);
-                                    if (key === q.correct) {
-                                        btn.classList.add('correct');
-                                    } else {
-                                        btn.classList.add('wrong');
-                                        all.forEach(b => {
-                                            if (b.textContent.startsWith(q.correct + '.')) {
-                                                b.classList.add('correct');
-                                            }
-                                        });
-                                    }
-                                    document.getElementById(`explain-${idx}`).style.display = 'block';
-                                };
-                                list.appendChild(btn);
-                            });
-                            container.appendChild(card);
-                        });
-                        documentPane.appendChild(container);
-                        appendMessage(`I've opened the interactive quiz for **${subtopic}**. Choose your answers to get instant feedback.`, 'ai');
-                    } else {
-                        // Document
-                        const iframe = document.createElement('iframe');
-                        iframe.src = `${data.file_url}#toolbar=0&navpanes=0`;
-                        iframe.className = 'document-view-frame';
-                        documentPane.appendChild(iframe);
-                        appendMessage(`I've opened **${subtopic}**. How can I assist you with these notes?`, 'ai');
-                    }
+
+                if (data.found && data.type === 'quiz') {
+                    renderQuiz(data.questions);
+                } else if (data.found && data.type === 'document') {
+                    renderDocument(data.file_url);
                 } else {
-                    // No resource found
-                    documentPane.style.display = 'none';
-                    chatPane.className = 'full-width';
-                    appendMessage(`📄 No document found for **${subtopic}**. You can still ask questions, and I'll answer based on my general knowledge.`, 'ai');
+                    documentPane.innerHTML = `<div class="empty-state"><h3>No content yet</h3><p>${data.content || 'Add files to this folder.'}</p></div>`;
                 }
             } catch (e) {
-                console.error('Load document error:', e);
-                appendMessage('❌ Error loading study materials. Please try again.', 'ai');
+                documentPane.innerHTML = '<div class="empty-state"><h3>Error</h3><p>Could not load content.</p></div>';
             }
         }
 
-        // Append message
-        function appendMessage(text, sender, timestamp) {
-            welcomeView.style.display = 'none';
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message ${sender}`;
-            if (sender === 'ai' && window.marked) {
-                msgDiv.innerHTML = marked.parse(text);
-            } else {
-                msgDiv.textContent = text;
-            }
-            if (sender === 'ai') {
-                const actions = document.createElement('div');
-                actions.className = 'msg-actions';
-                actions.innerHTML = `
-                    <button onclick="copyMessage(this)"><i class="fas fa-copy"></i> Copy</button>
-                    <button onclick="regenerateMessage(this)"><i class="fas fa-redo"></i> Regenerate</button>
+        function renderDocument(url) {
+            documentPane.innerHTML = `<iframe src="${url}#toolbar=0&navpanes=0" class="document-view-frame"></iframe>`;
+        }
+
+        function renderQuiz(questions) {
+            const container = document.createElement('div');
+            container.className = 'quiz-container';
+            questions.forEach((q, idx) => {
+                const card = document.createElement('div');
+                card.className = 'quiz-question-card';
+                card.innerHTML = `
+                    <div class="quiz-question-text">Q${idx+1}: ${q.question}</div>
+                    <div class="quiz-options-list"></div>
+                    <div class="quiz-explanation-box" id="explain-${idx}">
+                        <strong>💡 Explanation:</strong> ${q.explanation}
+                    </div>
                 `;
-                msgDiv.appendChild(actions);
-            }
-            const ts = document.createElement('span');
-            ts.className = 'timestamp';
-            ts.textContent = timestamp || new Date().toLocaleTimeString();
-            msgDiv.appendChild(ts);
-            chatMessages.appendChild(msgDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // Send message
-        async function sendMessage() {
-            const message = userInput.value.trim();
-            if (!message || !activeSubject) return;
-            appendMessage(message, 'user');
-            userInput.value = '';
-            userInput.style.height = 'auto';
-            sendBtn.disabled = true;
-
-            // Show typing indicator
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'typing-indicator';
-            typingDiv.innerHTML = '<span></span><span></span><span></span>';
-            chatMessages.appendChild(typingDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-
-            try {
-                const res = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        subject: activeSubject,
-                        subtopic: activeSubtopic,
-                        message: message
-                    })
+                const list = card.querySelector('.quiz-options-list');
+                Object.keys(q.alternatives).forEach(key => {
+                    const btn = document.createElement('button');
+                    btn.className = 'quiz-option-btn';
+                    btn.innerText = `${key}. ${q.alternatives[key]}`;
+                    btn.onclick = () => {
+                        const all = list.querySelectorAll('.quiz-option-btn');
+                        all.forEach(b => b.disabled = true);
+                        if (key === q.correct) {
+                            btn.classList.add('correct');
+                        } else {
+                            btn.classList.add('wrong');
+                            all.forEach(b => {
+                                if (b.innerText.startsWith(q.correct + '.')) {
+                                    b.classList.add('correct');
+                                }
+                            });
+                        }
+                        document.getElementById(`explain-${idx}`).style.display = 'block';
+                    };
+                    list.appendChild(btn);
                 });
-                const data = await res.json();
-                typingDiv.remove();
-                if (data.response) {
-                    appendMessage(data.response, 'ai');
-                } else {
-                    appendMessage('⚠️ The AI service returned an empty response. Please try again.', 'ai');
-                }
-            } catch (e) {
-                typingDiv.remove();
-                appendMessage('❌ Failed to connect to the AI service. Check your network.', 'ai');
-            }
-            sendBtn.disabled = false;
-        }
-
-        // Quick actions
-        function quickAction(text) {
-            userInput.value = text;
-            sendMessage();
-        }
-
-        // Copy message
-        function copyMessage(btn) {
-            const msg = btn.closest('.message');
-            const text = msg.textContent.replace(/Copy|Regenerate/g, '').trim();
-            navigator.clipboard.writeText(text).then(() => {
-                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                setTimeout(() => btn.innerHTML = '<i class="fas fa-copy"></i> Copy', 1500);
+                container.appendChild(card);
             });
+            documentPane.innerHTML = '';
+            documentPane.appendChild(container);
         }
 
-        // Regenerate (placeholder)
-        function regenerateMessage(btn) {
-            const msg = btn.closest('.message');
-            const prevMsg = msg.previousElementSibling;
-            if (prevMsg && prevMsg.classList.contains('user')) {
-                const text = prevMsg.textContent.replace(/Copy|Regenerate/g, '').trim();
-                msg.remove();
-                sendMessage();
-            }
-        }
-
-        // Clear chat
-        function clearChat() {
-            chatMessages.innerHTML = '';
-            welcomeView.style.display = 'flex';
-            documentPane.style.display = 'none';
-            chatPane.className = 'full-width';
-            activeSubject = '';
-            activeSubtopic = '';
-            userInput.disabled = true;
-            sendBtn.disabled = true;
-            headerTitle.innerHTML = 'Dashboard';
-            contextLabel.textContent = '';
-        }
-
-        // Show dashboard
-        function showDashboard() {
-            clearChat();
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('nav-dashboard').classList.add('active');
-        }
-
-        // Show chat only
-        function showChatOnly() {
-            clearChat();
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('nav-chat').classList.add('active');
-            // Set default chat mode
-            activeSubject = 'Chat with me';
-            activeSubtopic = 'General Chat';
-            headerTitle.innerHTML = 'AI Assistant <small>Open Learning</small>';
-            userInput.disabled = false;
-            sendBtn.disabled = false;
-            userInput.placeholder = 'Ask me anything...';
-            appendMessage('Welcome to your AI study assistant! How can I help you today?', 'ai');
-        }
-
-        // Toggle sidebar
-        function toggleSidebar() {
-            sidebar.classList.toggle('sidebar-hidden');
-        }
-
-        // Auto-resize textarea
-        userInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        // Keyboard shortcuts
-        userInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        sendBtn.addEventListener('click', sendMessage);
-
-        // Init
         loadCurriculum();
-
-        // Handle window resize for responsive
-        window.addEventListener('resize', function() {
-            if (window.innerWidth <= 768) {
-                sidebar.classList.add('sidebar-hidden');
-            } else {
-                sidebar.classList.remove('sidebar-hidden');
-            }
-        });
-        // Auto-hide sidebar on small screens
-        if (window.innerWidth <= 768) {
-            sidebar.classList.add('sidebar-hidden');
-        }
     </script>
 </body>
 </html>
