@@ -34,39 +34,19 @@
             padding-bottom: 12px;
             border-bottom: 1px solid #1e293b;
         }
-        .subject-category {
-            margin-bottom: 12px;
-        }
-        .subject-header {
-            padding: 10px 12px;
+        .subject-item {
+            padding: 12px 16px;
             background: #1e293b;
             border-radius: 8px;
             cursor: pointer;
-            font-weight: 600;
+            font-weight: 500;
             font-size: 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .subject-header:hover { background: #2d3748; }
-        .subtopic-list {
-            display: none;
-            padding-left: 16px;
-            margin-top: 6px;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .subtopic-item {
-            padding: 8px 12px;
-            background: #1e293b;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
+            margin-bottom: 8px;
             transition: background 0.2s;
             border-left: 3px solid transparent;
         }
-        .subtopic-item:hover { background: #2d3748; }
-        .subtopic-item.active { border-left-color: #3b82f6; background: #2d3748; }
+        .subject-item:hover { background: #2d3748; }
+        .subject-item.active { border-left-color: #3b82f6; background: #2d3748; }
 
         #main {
             flex: 1;
@@ -144,84 +124,65 @@
 
     <div id="sidebar">
         <h2>📚 Campus AI</h2>
-        <div id="course-menu-container"></div>
+        <div id="subject-list"></div>
     </div>
 
     <div id="main">
         <div id="header">
-            <span id="header-text">Select a subject and module</span>
-            <small id="context-label"></small>
+            <span id="header-text">Select a subject</span>
         </div>
         <div id="document-pane">
             <div class="empty-state">
                 <h3>Welcome to Campus AI</h3>
-                <p>Choose a subject from the sidebar to view study notes or practice questions.</p>
+                <p>Choose a subject from the sidebar to view notes or practice questions.</p>
             </div>
         </div>
     </div>
 
     <script>
-        const menuContainer = document.getElementById('course-menu-container');
+        const subjectList = document.getElementById('subject-list');
         const documentPane = document.getElementById('document-pane');
         const headerText = document.getElementById('header-text');
-        const contextLabel = document.getElementById('context-label');
 
         let activeSubject = '';
-        let activeSubtopic = '';
 
         async function loadCurriculum() {
             try {
                 const res = await fetch('/get_curriculum');
                 const data = await res.json();
-                menuContainer.innerHTML = '';
+                subjectList.innerHTML = '';
                 Object.keys(data).forEach(subject => {
-                    const cat = document.createElement('div');
-                    cat.className = 'subject-category';
-                    const header = document.createElement('div');
-                    header.className = 'subject-header';
-                    header.innerHTML = `<span>📁 ${subject}</span><span>▼</span>`;
-                    const list = document.createElement('div');
-                    list.className = 'subtopic-list';
-                    data[subject].forEach(subtopic => {
-                        const item = document.createElement('div');
-                        item.className = 'subtopic-item';
-                        item.innerText = subtopic;
-                        item.onclick = () => {
-                            document.querySelectorAll('.subtopic-item').forEach(el => el.classList.remove('active'));
-                            item.classList.add('active');
-                            selectSubject(subject, subtopic);
-                        };
-                        list.appendChild(item);
-                    });
-                    header.onclick = () => {
-                        const isOpen = list.style.display === 'flex';
-                        list.style.display = isOpen ? 'none' : 'flex';
-                        header.querySelector('span:last-child').innerText = isOpen ? '▼' : '▲';
+                    const item = document.createElement('div');
+                    item.className = 'subject-item';
+                    item.innerText = subject;
+                    item.onclick = () => {
+                        document.querySelectorAll('.subject-item').forEach(el => el.classList.remove('active'));
+                        item.classList.add('active');
+                        selectSubject(subject);
                     };
-                    cat.appendChild(header);
-                    cat.appendChild(list);
-                    menuContainer.appendChild(cat);
+                    subjectList.appendChild(item);
                 });
-                // Auto-open first subject
-                const firstHeader = menuContainer.querySelector('.subject-header');
-                if (firstHeader) firstHeader.click();
+                // Auto-select first
+                if (Object.keys(data).length > 0) {
+                    const first = subjectList.querySelector('.subject-item');
+                    first.classList.add('active');
+                    selectSubject(Object.keys(data)[0]);
+                }
             } catch (e) {
                 console.error('Load error:', e);
             }
         }
 
-        async function selectSubject(subject, subtopic) {
+        async function selectSubject(subject) {
             activeSubject = subject;
-            activeSubtopic = subtopic;
             headerText.innerText = subject;
-            contextLabel.innerText = `→ ${subtopic}`;
             documentPane.innerHTML = '<div style="text-align:center;padding:40px;">Loading...</div>';
 
             try {
                 const res = await fetch('/get_questions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ subject, subtopic })
+                    body: JSON.stringify({ subject: subject, subtopic: '' })
                 });
                 const data = await res.json();
 
