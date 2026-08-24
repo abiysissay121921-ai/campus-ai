@@ -1,229 +1,101 @@
-import asyncio
-from telethon import TelegramClient, events
-from telethon.sessions import StringSession
 import os
-import re
-import hashlib
+import uuid
+from flask import Flask, request, jsonify, render_template, session, send_file
+import json
+import chromadb
 
-print("=" * 50)
-print("🚀 TELEGRAM FORWARD BOT (Full Album + Dedup)")
-print("=" * 50)
+app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "campus_ai_secure_fallback_key")
 
-# Get credentials from environment variables
-API_ID = int(os.getenv("API_ID", 37303512))
-API_HASH = os.getenv("API_HASH", "dff48ddff61546b05d1d507a6c508ee8")
-STRING_SESSION = "1BJWap1wBu6POmPkSoZKGclkM5ByE5N-lD76_DCiBu-1yFW96uu3z7fHMAm82_ZxnRlgY3eUlQXt7kEwrSsMyo_b4cghzRNoRaifH1BuOaVW-0XRpX-Wa27109uI7G0yBZo4_hAyNKm12AhNdV9kvI9nJ-1svwy21EsiFPYv3Ud4H1DOTAM4Z2ND4L2CUGk5c3_Hv8Na_6aMsUpFkyXtMWJuTuefzLbZs49EPE2R938EUaENgeF_N-Wa--r0KlPzR-kYlRSe2uTsTJ1whJyqnNg2f1KkxXtOWs3vFNku7FU376Zxv6bFe27MhZhgw2tEcK6kqLcGY_2NQAjJ1iwRfH_tB2KbQt1Y="
+PRELOAD_FOLDER = 'knowledge_base'
 
-if not STRING_SESSION:
-    print("❌ STRING_SESSION environment variable not set!")
-    print("Please add it in Railway Variables")
-    exit(1)
+# Initialize ChromaDB (not used for AI now, but kept for future)
+chroma_client = chromadb.PersistentClient(path="./chroma_db")
+collection = chroma_client.get_or_create_collection(name="freshman_knowledge_base")
 
-source_channels = [
-    "TikvahUniversity",
-    "seledadotio",
-    "abiyselol",
-    "zena24now",
-]
-target_channel = "EBC_News_Official"
-your_link = "https://t.me/EBC_News_Official"
+# Curriculum Blueprint Map
+CURRICULUM = {
+    "General Psychology": ["Introduction & Research Methods", "Biological Bases of Behavior", "Sensation & Perception", "Learning & Memory"],
+    "Chemistry": ["Atomic Structure", "Chemical Bonding", "Stoichiometry", "Thermodynamics"],
+    "History": ["World Civilizations", "The Industrial Revolution", "Modern Global Conflicts", "Contemporary History"],
+    "Geography": ["Physical Geography", "Human & Cultural Geography", "Geographic Information Systems (GIS)", "Global Urbanization"]
+}
 
-print(f"\n📡 Monitoring {len(source_channels)} channels:")
-for ch in source_channels:
-    print(f"   - @{ch}")
-print(f"🎯 Forwarding to: @{target_channel}")
+# Ensure folders exist
+for subject, subtopics in CURRICULUM.items():
+    safe_subject = subject.replace(" ", "_").replace("(", "").replace(")", "")
+    for subtopic in subtopics:
+        folder_path = os.path.join(PRELOAD_FOLDER, safe_subject, subtopic.replace(" ", "_"))
+        os.makedirs(folder_path, exist_ok=True)
 
-client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
-processed = set()          # For deduplication of single messages
-processed_albums = set()   # For deduplication of albums (based on caption hash)
+@app.route('/')
+def index():
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+    return render_template('index.html')
 
-def clean_text(text):
-    if not text:
-        return ""
-    for ch in source_channels:
-        esc = re.escape(ch)
-        # @mentions
-        text = re.sub(rf'@{esc}\b', '', text, flags=re.IGNORECASE)
-        # t.me / telegram.me links, with or without protocol, with optional /message_id
-        text = re.sub(rf'(https?://)?(t\.me|telegram\.me)/{esc}(/\d+)?\b', '', text, flags=re.IGNORECASE)
-        # tg://resolve?domain=channel links
-        text = re.sub(rf'tg://resolve\?domain={esc}\S*', '', text, flags=re.IGNORECASE)
-    # Safety net: strip any remaining telegram links (any channel), same as before
-    text = re.sub(r'(https?://)?(t\.me|telegram\.me)/\S+', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'tg://resolve\?domain=\S+', '', text, flags=re.IGNORECASE)
-    # Collapse leftover blank lines
-    text = re.sub(r'\n\s*\n', '\n\n', text)
-    return text.strip()
+@app.route('/get_curriculum', methods=['GET'])
+def get_curriculum():
+    return jsonify(CURRICULUM)
 
-def get_text_hash(text):
-    """Generate a hash of the cleaned text for deduplication."""
-    cleaned = clean_text(text)
-    # Use first 200 chars as a fingerprint (good enough for dedup)
-    fingerprint = cleaned[:200] if cleaned else ""
-    return hashlib.md5(fingerprint.encode()).hexdigest()
+@app.route('/get_questions', methods=['POST'])
+def get_questions():
+    data = request.json
+    subject = data.get("subject", "")
+    subtopic = data.get("subtopic", "")
 
-def split_message(text, max_len=4000):
-    if len(text) <= max_len:
-        return [text]
-    chunks = []
-    for i in range(0, len(text), max_len):
-        chunks.append(text[i:i+max_len])
-    return chunks
+    safe_subject = subject.replace(" ", "_").replace("(", "").replace(")", "")
+    safe_subtopic = subtopic.replace(" ", "_")
+    folder_path = os.path.join(PRELOAD_FOLDER, safe_subject, safe_subtopic)
 
-def create_full_message(cleaned):
-    intro = "የቴሌግራም ቻናላችን join በማድረግ ወቅታዊ መረጃዎችን በቀላሉ ይከታተሉ!"
-    if cleaned:
-        return f"{cleaned}\n\n{intro}\n\n{your_link}\n{your_link}\n{your_link}\nሰላም ለእናንተ!"
+    if not os.path.exists(folder_path):
+        return jsonify({
+            "found": False,
+            "content": f"### No resource found\n\nPlace your files in:\n`knowledge_base/{safe_subject}/{safe_subtopic}/`"
+        })
+
+    # If the subtopic has "Questions" in name, try to load JSON quiz
+    if "Questions" in subtopic:
+        quiz_files = [f for f in os.listdir(folder_path) if f.endswith('.json') and not f.startswith('.')]
+        if quiz_files:
+            try:
+                with open(os.path.join(folder_path, quiz_files[0]), 'r', encoding='utf-8') as f:
+                    quiz_data = json.load(f)
+                return jsonify({
+                    "found": True,
+                    "type": "quiz",
+                    "questions": quiz_data
+                })
+            except Exception as e:
+                print(f"Error loading quiz: {e}")
+
+    # Otherwise, look for documents
+    files = [f for f in os.listdir(folder_path) if f.split('.')[-1].lower() in ['pdf', 'docx', 'txt'] and not f.startswith('.')]
+    if files:
+        target = files[0]
+        file_url = f"/view_file?subject={safe_subject}&subtopic={safe_subtopic}&filename={target}"
+        return jsonify({
+            "found": True,
+            "type": "document",
+            "file_url": file_url,
+            "filename": target
+        })
     else:
-        return f"{intro}\n\n{your_link}\n{your_link}\n{your_link}\nሰላም ለእናንተ!"
+        return jsonify({
+            "found": False,
+            "content": f"### No files found\n\nPlace a PDF, DOCX, TXT, or JSON in:\n`knowledge_base/{safe_subject}/{safe_subtopic}/`"
+        })
 
-async def send_long(channel, message):
-    chunks = split_message(message)
-    if not chunks:
-        return
-    print(f"📝 Splitting into {len(chunks)} parts")
-    first = await client.send_message(channel, chunks[0], parse_mode=None)
-    for i, chunk in enumerate(chunks[1:], start=2):
-        try:
-            await client.send_message(channel, chunk, reply_to=first.id, parse_mode=None)
-            print(f"📤 Part {i}/{len(chunks)} sent")
-            await asyncio.sleep(0.3)
-        except:
-            await client.send_message(channel, chunk, parse_mode=None)
-    return len(chunks)
+@app.route('/view_file', methods=['GET'])
+def view_file():
+    subject = request.args.get('subject')
+    subtopic = request.args.get('subtopic')
+    filename = request.args.get('filename')
+    filepath = os.path.join(PRELOAD_FOLDER, subject, subtopic, filename)
+    if os.path.exists(filepath):
+        return send_file(filepath)
+    return "File not found", 404
 
-# ========== ALBUM HANDLER – Forwards ALL photos in the album ==========
-@client.on(events.Album)
-async def album_handler(event):
-    try:
-        chat = await event.get_chat()
-        if not chat.username or chat.username not in source_channels:
-            return
-        grouped_id = event.grouped_id
-        if not grouped_id:
-            return
-
-        # Collect all media and captions
-        media_list = []
-        caption_parts = []
-        for msg in event.messages:
-            if msg.media:
-                media_list.append(msg.media)
-            if msg.raw_text:
-                caption_parts.append(msg.raw_text)
-
-        if not media_list:
-            print("⚠️ No media in album, skipping.")
-            return
-
-        # Combine captions and clean
-        combined_caption = "\n".join(caption_parts) if caption_parts else ""
-        cleaned = clean_text(combined_caption)
-        
-        # DEDUPLICATION: Check if we've seen this content before
-        caption_hash = get_text_hash(combined_caption)
-        album_key = f"{chat.id}_album_{caption_hash}"
-        
-        if album_key in processed_albums:
-            print(f"⏩ Skipping duplicate album from @{chat.username} (content already forwarded)")
-            return
-        
-        # Mark as processed
-        processed_albums.add(album_key)
-        if len(processed_albums) > 1000:
-            processed_albums.clear()
-
-        # Also mark individual message IDs to prevent double processing
-        for msg in event.messages:
-            msg_key = f"{chat.id}_{msg.id}"
-            processed.add(msg_key)
-
-        full = create_full_message(cleaned)
-
-        print(f"\n📸 Album detected from @{chat.username} ({len(media_list)} media items)")
-        print(f"   Caption length: {len(full)} characters")
-
-        # Send ALL media as a single album with the caption attached
-        await client.send_file(
-            target_channel,
-            media_list,
-            caption=full,
-            parse_mode=None,
-            album=True  # This preserves the album grouping!
-        )
-        print(f"✅ Album forwarded: {len(media_list)} media items with caption")
-
-    except Exception as e:
-        print(f"❌ Album handler error: {e}")
-        import traceback
-        traceback.print_exc()
-
-# ========== SINGLE MESSAGE HANDLER ==========
-@client.on(events.NewMessage)
-async def handler(event):
-    try:
-        # Skip messages that belong to an album (handled above)
-        if event.message.grouped_id is not None:
-            return
-
-        chat = await event.get_chat()
-        if not chat.username or chat.username not in source_channels:
-            return
-
-        msg_id = f"{chat.id}_{event.id}"
-        if msg_id in processed:
-            return
-
-        print(f"\n📨 From @{chat.username} (single message)")
-
-        original = event.raw_text or ""
-        cleaned = clean_text(original)
-
-        # DEDUPLICATION: Check if we've seen this content before
-        caption_hash = get_text_hash(original)
-        if caption_hash:
-            # For text-only or single media with caption, check for duplicates
-            # We'll use a separate check for single messages
-            single_key = f"{chat.id}_single_{caption_hash}"
-            if single_key in processed_albums:
-                print(f"⏩ Skipping duplicate single message from @{chat.username}")
-                return
-            processed_albums.add(single_key)
-            if len(processed_albums) > 1000:
-                processed_albums.clear()
-
-        processed.add(msg_id)
-        if len(processed) > 1000:
-            processed.clear()
-
-        full = create_full_message(cleaned)
-
-        if event.message.media:
-            print("📎 Single media – sending with caption")
-            await client.send_file(
-                target_channel,
-                event.message.media,
-                caption=full,
-                parse_mode=None
-            )
-            print("✅ Single media sent with caption")
-        else:
-            # Text-only – split if needed
-            parts = await send_long(target_channel, full)
-            print(f"✅ Done – {parts} parts sent")
-
-    except Exception as e:
-        print(f"❌ Error in handler: {e}")
-        import traceback
-        traceback.print_exc()
-
-async def main():
-    print("\n🔌 Connecting...")
-    await client.start()
-    me = await client.get_me()
-    print(f"✅ Connected as @{me.username}")
-    print("🤖 Bot running\n")
-    await client.run_until_disconnected()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
