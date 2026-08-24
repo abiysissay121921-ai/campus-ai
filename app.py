@@ -1,158 +1,229 @@
-cat > app.py << 'EOF'
+import asyncio
+from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 import os
-import requests
-from flask import Flask, render_template_string, request, jsonify
-from dotenv import load_dotenv
-import chromadb
+import re
+import hashlib
 
-load_dotenv()
+print("=" * 50)
+print("🚀 TELEGRAM FORWARD BOT (Full Album + Dedup)")
+print("=" * 50)
 
-app = Flask(__name__)
+# Get credentials from environment variables
+API_ID = int(os.getenv("API_ID", 37303512))
+API_HASH = os.getenv("API_HASH", "dff48ddff61546b05d1d507a6c508ee8")
+STRING_SESSION = "1BJWap1wBu6POmPkSoZKGclkM5ByE5N-lD76_DCiBu-1yFW96uu3z7fHMAm82_ZxnRlgY3eUlQXt7kEwrSsMyo_b4cghzRNoRaifH1BuOaVW-0XRpX-Wa27109uI7G0yBZo4_hAyNKm12AhNdV9kvI9nJ-1svwy21EsiFPYv3Ud4H1DOTAM4Z2ND4L2CUGk5c3_Hv8Na_6aMsUpFkyXtMWJuTuefzLbZs49EPE2R938EUaENgeF_N-Wa--r0KlPzR-kYlRSe2uTsTJ1whJyqnNg2f1KkxXtOWs3vFNku7FU376Zxv6bFe27MhZhgw2tEcK6kqLcGY_2NQAjJ1iwRfH_tB2KbQt1Y="
 
-# Configuration
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LuLM6fJtFv5H_sGNGGO845moH4L5-eMoTo3BJkte0Ntg")
-GEMINI_MODEL = "gemini-3.5-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+if not STRING_SESSION:
+    print("❌ STRING_SESSION environment variable not set!")
+    print("Please add it in Railway Variables")
+    exit(1)
 
-# ChromaDB
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
-try:
-    collection = chroma_client.get_collection(name="campus_kb")
-except Exception:
-    collection = chroma_client.get_or_create_collection(name="campus_kb")
+source_channels = [
+    "TikvahUniversity",
+    "seledadotio",
+    "abiyselol",
+    "zena24now",
+]
+target_channel = "EBC_News_Official"
+your_link = "https://t.me/EBC_News_Official"
 
-# Curriculum (same as before)
-CURRICULUM = {
-    "General Psychology": {
-        "modules": ["Introduction & Research Methods", "Biological Bases of Behavior", "Sensation & Perception", "Learning & Memory"],
-        "description": "Fundamental principles of human behavior and mental processes."
-    },
-    "Chemistry": {
-        "modules": ["Atomic Structure", "Chemical Bonding", "Stoichiometry", "Thermodynamics"],
-        "description": "Core university-level general chemistry principles."
-    },
-    "History": {
-        "modules": ["World Civilizations", "The Industrial Revolution", "Modern Global Conflicts", "Contemporary History"],
-        "description": "Major historical eras, movements, and global transformations."
-    },
-    "Geography": {
-        "modules": ["Physical Geography", "Human & Cultural Geography", "Geographic Information Systems (GIS)", "Global Urbanization"],
-        "description": "Study of earth landscapes, environments, and human societies."
-    }
-}
+print(f"\n📡 Monitoring {len(source_channels)} channels:")
+for ch in source_channels:
+    print(f"   - @{ch}")
+print(f"🎯 Forwarding to: @{target_channel}")
 
-INDEX_HTML = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CAMPUS AI - University Platform</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
-    <header class="bg-slate-800 border-b border-slate-700 p-4 shadow-md flex justify-between items-center">
-        <h1 class="text-xl font-bold text-cyan-400 tracking-wide">CAMPUS AI <span class="text-xs bg-cyan-900 text-cyan-200 px-2 py-1 rounded ml-2">Gemini 3.5 Flash</span></h1>
-        <span class="text-sm text-slate-400">Local RAG & Education Hub</span>
-    </header>
+client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
+processed = set()          # For deduplication of single messages
+processed_albums = set()   # For deduplication of albums (based on caption hash)
 
-    <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 max-w-7xl mx-auto w-full">
-        <aside class="w-full md:w-1/4 bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col gap-4">
-            <h2 class="font-semibold text-slate-200 border-b border-slate-700 pb-2">Curriculum Subjects</h2>
-            <div class="flex flex-col gap-2">
-                {% for subject, details in curriculum.items() %}
-                <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60">
-                    <h3 class="font-bold text-cyan-300 text-sm">{{ subject }}</h3>
-                    <p class="text-xs text-slate-400 mt-1">{{ details.description }}</p>
-                </div>
-                {% endfor %}
-            </div>
-        </aside>
+def clean_text(text):
+    if not text:
+        return ""
+    for ch in source_channels:
+        esc = re.escape(ch)
+        # @mentions
+        text = re.sub(rf'@{esc}\b', '', text, flags=re.IGNORECASE)
+        # t.me / telegram.me links, with or without protocol, with optional /message_id
+        text = re.sub(rf'(https?://)?(t\.me|telegram\.me)/{esc}(/\d+)?\b', '', text, flags=re.IGNORECASE)
+        # tg://resolve?domain=channel links
+        text = re.sub(rf'tg://resolve\?domain={esc}\S*', '', text, flags=re.IGNORECASE)
+    # Safety net: strip any remaining telegram links (any channel), same as before
+    text = re.sub(r'(https?://)?(t\.me|telegram\.me)/\S+', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'tg://resolve\?domain=\S+', '', text, flags=re.IGNORECASE)
+    # Collapse leftover blank lines
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    return text.strip()
 
-        <section class="flex-1 bg-slate-800 rounded-xl border border-slate-700 flex flex-col h-[70vh] md:h-auto overflow-hidden">
-            <div id="chat-history" class="flex-1 p-4 overflow-y-auto space-y-4 flex flex-col">
-                <div class="bg-slate-700/50 p-3 rounded-lg max-w-[80%] self-start text-sm">
-                    Hello! I'm your CAMPUS AI assistant powered by Gemini 3.5 Flash. Ask me anything about your university coursework, subjects, or study guides!
-                </div>
-            </div>
-            <div class="p-3 bg-slate-800 border-t border-slate-700 flex gap-2">
-                <input type="text" id="user-input" placeholder="Type your academic query..." 
-                    class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
-                <button onclick="sendMessage()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition">Send</button>
-            </div>
-        </section>
-    </main>
+def get_text_hash(text):
+    """Generate a hash of the cleaned text for deduplication."""
+    cleaned = clean_text(text)
+    # Use first 200 chars as a fingerprint (good enough for dedup)
+    fingerprint = cleaned[:200] if cleaned else ""
+    return hashlib.md5(fingerprint.encode()).hexdigest()
 
-    <script>
-        async function sendMessage() {
-            const inputField = document.getElementById('user-input');
-            const chatHistory = document.getElementById('chat-history');
-            const message = inputField.value.trim();
-            if (!message) return;
+def split_message(text, max_len=4000):
+    if len(text) <= max_len:
+        return [text]
+    chunks = []
+    for i in range(0, len(text), max_len):
+        chunks.append(text[i:i+max_len])
+    return chunks
 
-            chatHistory.innerHTML += `<div class="bg-cyan-900/40 border border-cyan-700/50 p-3 rounded-lg max-w-[80%] self-end text-sm">${message}</div>`;
-            inputField.value = '';
-            chatHistory.scrollTop = chatHistory.scrollHeight;
+def create_full_message(cleaned):
+    intro = "የቴሌግራም ቻናላችን join በማድረግ ወቅታዊ መረጃዎችን በቀላሉ ይከታተሉ!"
+    if cleaned:
+        return f"{cleaned}\n\n{intro}\n\n{your_link}\n{your_link}\n{your_link}\nሰላም ለእናንተ!"
+    else:
+        return f"{intro}\n\n{your_link}\n{your_link}\n{your_link}\nሰላም ለእናንተ!"
 
-            try {
-                const res = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
-                });
-                const data = await res.json();
-                chatHistory.innerHTML += `<div class="bg-slate-700/50 border border-slate-600/50 p-3 rounded-lg max-w-[80%] self-start text-sm">${data.response || data.error}</div>`;
-            } catch (err) {
-                chatHistory.innerHTML += `<div class="bg-red-900/50 p-3 rounded-lg max-w-[80%] self-start text-sm text-red-200">Error communicating with server.</div>`;
-            }
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-        }
-
-        document.getElementById('user-input').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') { sendMessage(); }
-        });
-    </script>
-</body>
-</html>
-"""
-
-@app.route('/')
-def index():
-    return render_template_string(INDEX_HTML, curriculum=CURRICULUM)
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    try:
-        data = request.json
-        user_message = data.get('message', '')
-        if not user_message:
-            return jsonify({'error': 'Empty message'}), 400
-
-        # RAG context (optional)
-        context_text = ""
+async def send_long(channel, message):
+    chunks = split_message(message)
+    if not chunks:
+        return
+    print(f"📝 Splitting into {len(chunks)} parts")
+    first = await client.send_message(channel, chunks[0], parse_mode=None)
+    for i, chunk in enumerate(chunks[1:], start=2):
         try:
-            results = collection.query(query_texts=[user_message], n_results=2)
-            if results and results.get('documents') and results['documents'][0]:
-                context_text = "\n".join(results['documents'][0])
-        except Exception:
-            pass
+            await client.send_message(channel, chunk, reply_to=first.id, parse_mode=None)
+            print(f"📤 Part {i}/{len(chunks)} sent")
+            await asyncio.sleep(0.3)
+        except:
+            await client.send_message(channel, chunk, parse_mode=None)
+    return len(chunks)
 
-        prompt = f"Context from study materials:\n{context_text}\n\nUser Question: {user_message}" if context_text else user_message
+# ========== ALBUM HANDLER – Forwards ALL photos in the album ==========
+@client.on(events.Album)
+async def album_handler(event):
+    try:
+        chat = await event.get_chat()
+        if not chat.username or chat.username not in source_channels:
+            return
+        grouped_id = event.grouped_id
+        if not grouped_id:
+            return
 
-        # Use the same request as curl
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        response = requests.post(GEMINI_URL, json=payload, headers={"Content-Type": "application/json"})
+        # Collect all media and captions
+        media_list = []
+        caption_parts = []
+        for msg in event.messages:
+            if msg.media:
+                media_list.append(msg.media)
+            if msg.raw_text:
+                caption_parts.append(msg.raw_text)
 
-        if response.status_code == 200:
-            result = response.json()
-            ai_response = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "No response")
-            return jsonify({'response': ai_response})
-        else:
-            return jsonify({'error': f'Gemini API error: {response.text}'}), response.status_code
+        if not media_list:
+            print("⚠️ No media in album, skipping.")
+            return
+
+        # Combine captions and clean
+        combined_caption = "\n".join(caption_parts) if caption_parts else ""
+        cleaned = clean_text(combined_caption)
+        
+        # DEDUPLICATION: Check if we've seen this content before
+        caption_hash = get_text_hash(combined_caption)
+        album_key = f"{chat.id}_album_{caption_hash}"
+        
+        if album_key in processed_albums:
+            print(f"⏩ Skipping duplicate album from @{chat.username} (content already forwarded)")
+            return
+        
+        # Mark as processed
+        processed_albums.add(album_key)
+        if len(processed_albums) > 1000:
+            processed_albums.clear()
+
+        # Also mark individual message IDs to prevent double processing
+        for msg in event.messages:
+            msg_key = f"{chat.id}_{msg.id}"
+            processed.add(msg_key)
+
+        full = create_full_message(cleaned)
+
+        print(f"\n📸 Album detected from @{chat.username} ({len(media_list)} media items)")
+        print(f"   Caption length: {len(full)} characters")
+
+        # Send ALL media as a single album with the caption attached
+        await client.send_file(
+            target_channel,
+            media_list,
+            caption=full,
+            parse_mode=None,
+            album=True  # This preserves the album grouping!
+        )
+        print(f"✅ Album forwarded: {len(media_list)} media items with caption")
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Album handler error: {e}")
+        import traceback
+        traceback.print_exc()
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
-EOF
+# ========== SINGLE MESSAGE HANDLER ==========
+@client.on(events.NewMessage)
+async def handler(event):
+    try:
+        # Skip messages that belong to an album (handled above)
+        if event.message.grouped_id is not None:
+            return
+
+        chat = await event.get_chat()
+        if not chat.username or chat.username not in source_channels:
+            return
+
+        msg_id = f"{chat.id}_{event.id}"
+        if msg_id in processed:
+            return
+
+        print(f"\n📨 From @{chat.username} (single message)")
+
+        original = event.raw_text or ""
+        cleaned = clean_text(original)
+
+        # DEDUPLICATION: Check if we've seen this content before
+        caption_hash = get_text_hash(original)
+        if caption_hash:
+            # For text-only or single media with caption, check for duplicates
+            # We'll use a separate check for single messages
+            single_key = f"{chat.id}_single_{caption_hash}"
+            if single_key in processed_albums:
+                print(f"⏩ Skipping duplicate single message from @{chat.username}")
+                return
+            processed_albums.add(single_key)
+            if len(processed_albums) > 1000:
+                processed_albums.clear()
+
+        processed.add(msg_id)
+        if len(processed) > 1000:
+            processed.clear()
+
+        full = create_full_message(cleaned)
+
+        if event.message.media:
+            print("📎 Single media – sending with caption")
+            await client.send_file(
+                target_channel,
+                event.message.media,
+                caption=full,
+                parse_mode=None
+            )
+            print("✅ Single media sent with caption")
+        else:
+            # Text-only – split if needed
+            parts = await send_long(target_channel, full)
+            print(f"✅ Done – {parts} parts sent")
+
+    except Exception as e:
+        print(f"❌ Error in handler: {e}")
+        import traceback
+        traceback.print_exc()
+
+async def main():
+    print("\n🔌 Connecting...")
+    await client.start()
+    me = await client.get_me()
+    print(f"✅ Connected as @{me.username}")
+    print("🤖 Bot running\n")
+    await client.run_until_disconnected()
+
+if __name__ == "__main__":
+    asyncio.run(main())
